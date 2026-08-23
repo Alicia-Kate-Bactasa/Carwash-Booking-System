@@ -188,15 +188,16 @@
                 try {
                     const { data: bData } = await sb.from('bookings')
                         .select('time_slot, end_time_slot, booking_status')
-                        .eq('scheduled_date', dateInput)
-                        .not('booking_status', 'in', '("Cancelled","No-Show")');
+                        .eq('scheduled_date', dateInput);
                     if (bData) {
-                        existingBookings = bData.map(b => {
-                            const bStart = parseTimeToMinutes(b.time_slot);
-                            const bDuration = currentDurationMins;
-                            const bEnd = b.end_time_slot ? parseTimeToMinutes(b.end_time_slot) : (bStart + bDuration);
-                            return { start: bStart, end: bEnd };
-                        });
+                        existingBookings = bData
+                            .filter(b => b.booking_status !== 'Cancelled' && b.booking_status !== 'No-Show')
+                            .map(b => {
+                                const bStart = parseTimeToMinutes(b.time_slot);
+                                const bDuration = currentDurationMins;
+                                const bEnd = b.end_time_slot ? parseTimeToMinutes(b.end_time_slot) : (bStart + bDuration);
+                                return { start: bStart, end: bEnd };
+                            });
                     }
                 } catch (err) {
                     console.warn("Supabase slot availability notice:", err);
