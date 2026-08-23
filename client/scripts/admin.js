@@ -33,7 +33,7 @@ const defaultServices = [];
                 try {
                     const { data, error } = await sb
                         .from('bookings')
-                        .select('*, services(*), profiles(*), customers(*)');
+                        .select('*');
 
                     if (!error && Array.isArray(data)) {
                         appointmentsRegistry = data.map(app => {
@@ -71,7 +71,7 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data } = await sb.from('invoices').select('*, payments(*), bookings(*)');
+                    const { data } = await sb.from('invoices').select('*');
                     if (data) {
                         invoicesCollection = data;
                         renderInvoicePendingTable();
@@ -100,7 +100,7 @@ const defaultServices = [];
             if (sb) {
                 try {
                     // Fetch ONLY active/verified subscriptions for Directory
-                    const { data: subsData } = await sb.from('subscriptions').select('*, profiles(*)').eq('plan_status', 'Active');
+                    const { data: subsData } = await sb.from('subscriptions').select('*').eq('plan_status', 'Active');
                     const { data: profData } = await sb.from('profiles').select('*').eq('subscription_status', 'Active');
 
                     if (Array.isArray(subsData)) {
@@ -163,7 +163,7 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data } = await sb.from('subscriptions').select('*, profiles(*), payments(*)').or('plan_status.eq.Payment Pending,plan_status.eq.Pending');
+                    const { data } = await sb.from('subscriptions').select('*').or('plan_status.eq.Payment Pending,plan_status.eq.Pending');
                     if (Array.isArray(data)) {
                         data.forEach(sub => {
                             const eVal = sub.profiles?.email || '';

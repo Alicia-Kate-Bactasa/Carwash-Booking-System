@@ -1231,10 +1231,15 @@
                     const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                     const numericId = parseInt(bookingId.replace(/\D/g, ''), 10);
                     if (sb && !isNaN(numericId)) {
-                        const { data: bData } = await sb.from('bookings').select('*, services(service_name)').eq('booking_id', numericId).maybeSingle();
+                        const { data: bData } = await sb.from('bookings').select('*').eq('booking_id', numericId).maybeSingle();
                         if (bData) {
-                            serviceInput.value = bData.services?.service_name || 'Car Wash';
-                            serviceDisplay.value = bData.services?.service_name || 'Car Wash';
+                            let serviceName = 'Car Wash';
+                            if (bData.service_id) {
+                                const { data: sData } = await sb.from('services').select('service_name').eq('service_id', bData.service_id).maybeSingle();
+                                if (sData) serviceName = sData.service_name;
+                            }
+                            serviceInput.value = serviceName;
+                            serviceDisplay.value = serviceName;
                             if (nameInput) nameInput.value = '';
                             if (bookingDateSpan) bookingDateSpan.textContent = bData.scheduled_date || '-';
                             if (bookingPriceSpan) bookingPriceSpan.textContent = bData.purchased_price ? `₱${bData.purchased_price}` : '-';
