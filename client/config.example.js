@@ -4,3 +4,5 @@
  */
 window.SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT_ID.supabase.co";
 window.SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+window.API_BASE_URL = "http://localhost:5000/api/v1";
+

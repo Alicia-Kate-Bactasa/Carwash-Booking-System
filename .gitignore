@@ -16,7 +16,8 @@ desktop.ini
 
 # === Database Backups & Local Dumps ===
 *.sql
-!supabase_schema.sql
+**/*.sql
+database/*.sql
 backup/
 *.log
 
@@ -24,15 +25,18 @@ backup/
 uploads/*
 !uploads/.gitkeep
 
-# === Development Configuration Overrides ===
+# === Node & Backend Server Dependencies ===
+node_modules/
+server/node_modules/
 .env
 .env.local
-config.js
-config.local.js
-api/config.local.php
+server/.env
 
-# Ignore the real database configuration file containing secrets
-api/config.php
+# === Frontend Configuration Secrets ===
+config.js
+client/config.js
+config.local.js
+client/config.local.js
 
 # Ignore any local text logs or OS system files
 *.log

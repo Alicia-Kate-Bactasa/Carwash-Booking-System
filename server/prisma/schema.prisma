@@ -1,0 +1,211 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum BookingStatus {
+  Pending
+  Pending_Verification @map("Pending Verification")
+  Confirmed
+  Completed
+  Cancelled
+  No_Show              @map("No-Show")
+  Paid
+  Scheduled
+
+  @@map("booking_status_enum")
+}
+
+enum CustomerType {
+  Regular
+  Walk_In      @map("Walk-In")
+
+  @@map("customer_type_enum")
+}
+
+enum InvoiceType {
+  Single_Detailing @map("Single Detailing")
+  Monthly_Roster   @map("Monthly Roster")
+
+  @@map("invoice_type_enum")
+}
+
+enum InvoiceStatus {
+  Paid
+  Pending
+  Void
+
+  @@map("invoice_status_enum")
+}
+
+enum PaymentStatus {
+  Paid
+  Pending_Approval @map("Pending Approval")
+  Rejected
+
+  @@map("payment_status_enum")
+}
+
+enum PlanStatus {
+  Active
+  Payment_Pending      @map("Payment Pending")
+  Expired
+  Cancellation_Pending @map("Cancellation Pending")
+
+  @@map("plan_status_enum")
+}
+
+enum UserRole {
+  Admin
+  Customer
+
+  @@map("user_role_enum")
+}
+
+enum ActionType {
+  login_attempt
+  password_reset
+
+  @@map("action_type_enum")
+}
+
+model Service {
+  service_id          Int       @id @default(autoincrement())
+  service_name        String    @db.VarChar(100)
+  service_price       Decimal   @db.Decimal(10, 2)
+  service_category    String    @db.VarChar(50)
+  service_duration    Int
+  service_description String?   @db.Text
+  last_updated_by     String?   @default("Admin") @db.VarChar(50)
+  is_active           Boolean   @default(true)
+
+  bookings            Booking[]
+
+  @@map("Service")
+}
+
+model User {
+  user_id          Int                  @id @default(autoincrement())
+  email            String               @unique @db.VarChar(100)
+  username         String               @unique @db.VarChar(50)
+  password         String               @db.VarChar(255)
+  role             UserRole             @default(Customer)
+
+  bookings         Booking[]
+  subscriptions    Subscription[]
+  security_actions UserSecurityAction[]
+
+  @@map("User")
+}
+
+model Customer {
+  customer_id   Int          @id @default(autoincrement())
+  full_name     String       @db.VarChar(100)
+  phone_number  String       @db.VarChar(20)
+  email         String?      @db.VarChar(100)
+  customer_type CustomerType @default(Regular)
+  booking_count Int          @default(0)
+
+  bookings      Booking[]
+
+  @@map("Customer")
+}
+
+model Subscription {
+  subscription_id          Int        @id @default(autoincrement())
+  user_id                  Int?
+  plan_tier                String     @default("Unlimited Basic Wash") @db.VarChar(50)
+  plan_status              PlanStatus @default(Payment_Pending)
+  created_at               DateTime?  @default(now()) @db.Timestamptz
+  last_billing_date        DateTime?  @db.Date
+  next_billing_date        DateTime?  @db.Date
+  completed_sessions_count Int?       @default(0)
+  grace_period_start       DateTime?  @db.Timestamptz
+
+  user                     User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  invoices                 Invoice[]
+
+  @@map("Subscription")
+}
+
+model Booking {
+  booking_id        Int           @id @default(autoincrement())
+  customer_id       Int?
+  user_id           Int?
+  service_id        Int
+  scheduled_date    DateTime      @db.Date
+  time_slot         String        @db.VarChar(50)
+  bay_number        Int           @default(1)
+  purchased_price   Decimal       @db.Decimal(10, 2)
+  booking_status    BookingStatus @default(Pending)
+  status_updated_at DateTime?     @default(now()) @db.Timestamptz
+
+  customer          Customer?     @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
+  user              User?         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  service           Service       @relation(fields: [service_id], references: [service_id])
+  feedback          Feedback?
+  invoices          Invoice[]
+
+  @@map("Booking")
+}
+
+model Feedback {
+  feedback_id Int       @id @default(autoincrement())
+  booking_id  Int?      @unique
+  rating      Int?
+  comments    String?   @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamptz
+
+  booking     Booking?  @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+
+  @@map("Feedback")
+}
+
+model Invoice {
+  invoice_id      Int           @id @default(autoincrement())
+  booking_id      Int?
+  subscription_id Int?
+  total_amount    Decimal       @db.Decimal(10, 2)
+  issued_at       DateTime?     @default(now()) @db.Timestamptz
+  invoice_type    InvoiceType
+  invoice_status  InvoiceStatus @default(Pending)
+
+  booking         Booking?      @relation(fields: [booking_id], references: [booking_id], onDelete: SetNull)
+  subscription    Subscription? @relation(fields: [subscription_id], references: [subscription_id], onDelete: SetNull)
+  payments        Payment[]
+
+  @@map("Invoice")
+}
+
+model Payment {
+  payment_id       Int           @id @default(autoincrement())
+  invoice_id       Int
+  amount           Decimal       @db.Decimal(10, 2)
+  payment_date     DateTime?     @default(now()) @db.Timestamptz
+  payment_method   String?       @default("GCash") @db.VarChar(30)
+  payment_status   PaymentStatus @default(Pending_Approval)
+  proof_of_payment String        @db.VarChar(255)
+
+  invoice          Invoice       @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
+
+  @@map("Payment")
+}
+
+model UserSecurityAction {
+  action_id   Int        @id @default(autoincrement())
+  user_id     Int?
+  action_type ActionType
+  ip_address  String     @db.VarChar(45)
+  identifier  String     @db.VarChar(100)
+  token       String?    @unique @db.VarChar(64)
+  expires_at  DateTime?  @db.Timestamptz
+  created_at  DateTime?  @default(now()) @db.Timestamptz
+
+  user        User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("UserSecurityAction")
+}
