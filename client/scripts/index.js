@@ -166,12 +166,17 @@
                 }
             }
 
+            if (!activeServiceDuration) {
+                timeContainer.innerHTML = `<p class="p-4 text-xs text-neutral-400 font-semibold text-center">Please select a service first</p>`;
+                return;
+            }
+
             if (!dateInput) {
                 timeContainer.innerHTML = `<p class="p-4 text-xs text-neutral-400 font-semibold text-center">Please select a booking date first</p>`;
                 return;
             }
 
-            const currentDurationMins = activeServiceDuration ? parseDurationMinutes(activeServiceDuration) : 60;
+            const currentDurationMins = parseDurationMinutes(activeServiceDuration);
             const startDayMins = 8 * 60;  // 8:00 AM
             const endDayMins = 17 * 60;   // 5:00 PM last start window
             const stepInterval = currentDurationMins <= 30 ? 20 : 30; // Adapt step interval to service length
