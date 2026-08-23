@@ -433,7 +433,7 @@
                                 const filePath = `receipts/guest_${Date.now()}_${paymentProofFile.name}`;
                                 const { error: uploadError } = await sb.storage
                                     .from('payment-proofs')
-                                    .upload(filePath, paymentProofFile);
+                                    .upload(filePath, paymentProofFile, { upsert: true });
                                 if (!uploadError) {
                                     proofUrl = sb.storage.from('payment-proofs').getPublicUrl(filePath).data.publicUrl;
                                 } else {
@@ -745,7 +745,7 @@
                         const filePath = `receipts/${authUserId}_${Date.now()}_${paymentProofFile.name}`;
                         const { data: uploadData, error: uploadError } = await sb.storage
                             .from('payment-proofs')
-                            .upload(filePath, paymentProofFile);
+                            .upload(filePath, paymentProofFile, { upsert: true });
                         if (!uploadError) {
                             proofUrl = sb.storage.from('payment-proofs').getPublicUrl(filePath).data.publicUrl;
                         }

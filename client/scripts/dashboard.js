@@ -727,7 +727,7 @@ const csrfToken = '';
                         const filePath = `receipts/${dbUser.user_id}_${Date.now()}_${file.name}`;
                         const { error: uploadError } = await sb.storage
                             .from('payment-proofs')
-                            .upload(filePath, file);
+                            .upload(filePath, file, { upsert: true });
                         if (!uploadError) {
                             proofUrl = sb.storage.from('payment-proofs').getPublicUrl(filePath).data.publicUrl;
                         } else {
