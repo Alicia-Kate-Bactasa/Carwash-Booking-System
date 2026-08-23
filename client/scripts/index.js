@@ -86,7 +86,12 @@
                 if (element && id !== menuId) element.classList.add('hidden');
             });
             const targetedMenu = document.getElementById(menuId);
-            if(targetedMenu) targetedMenu.classList.toggle('hidden');
+            if(targetedMenu) {
+                targetedMenu.classList.toggle('hidden');
+                if (menuId === 'timeDropdownMenu' && !targetedMenu.classList.contains('hidden')) {
+                    fetchAvailableTimeSlots();
+                }
+            }
         }
 
         function parseDuration(durationStr) {
@@ -161,12 +166,12 @@
                 }
             }
 
-            if (!dateInput || !activeServiceDuration) {
-                timeContainer.innerHTML = `<p class="p-4 text-xs text-neutral-400 font-semibold text-center">Please select a service and date first</p>`;
+            if (!dateInput) {
+                timeContainer.innerHTML = `<p class="p-4 text-xs text-neutral-400 font-semibold text-center">Please select a booking date first</p>`;
                 return;
             }
 
-            const currentDurationMins = parseDurationMinutes(activeServiceDuration);
+            const currentDurationMins = activeServiceDuration ? parseDurationMinutes(activeServiceDuration) : 60;
             const startDayMins = 8 * 60;  // 8:00 AM
             const endDayMins = 17 * 60;   // 5:00 PM last start window
             const stepInterval = currentDurationMins <= 30 ? 20 : 30; // Adapt step interval to service length
