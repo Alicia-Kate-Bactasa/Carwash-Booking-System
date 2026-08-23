@@ -187,13 +187,13 @@
             if (sb) {
                 try {
                     const { data: bData } = await sb.from('bookings')
-                        .select('time_slot, end_time_slot, booking_status, services(service_duration)')
+                        .select('time_slot, end_time_slot, booking_status')
                         .eq('scheduled_date', dateInput)
                         .not('booking_status', 'in', '("Cancelled","No-Show")');
                     if (bData) {
                         existingBookings = bData.map(b => {
                             const bStart = parseTimeToMinutes(b.time_slot);
-                            const bDuration = b.services?.service_duration ? parseDurationMinutes(b.services.service_duration) : 60;
+                            const bDuration = currentDurationMins;
                             const bEnd = b.end_time_slot ? parseTimeToMinutes(b.end_time_slot) : (bStart + bDuration);
                             return { start: bStart, end: bEnd };
                         });
