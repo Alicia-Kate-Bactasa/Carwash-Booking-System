@@ -26,10 +26,7 @@
         ::-webkit-scrollbar-track { background: #ffffff; }
         ::-webkit-scrollbar-thumb { background: #000000; border-radius: 2rem; }
     </style>
-    <!-- Supabase JS Client SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-    <script src="scripts/supabaseClient.js"></script>
+    <!-- Supabase SDK is loaded once near the end of <body>, before the page scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const user = await getCurrentUser();
@@ -578,7 +575,7 @@
     <script src="config.js"></script>
     <script src="scripts/supabaseClient.js"></script>
     <script src="scripts/modals.js"></script>
-    <script src="scripts/admin.js?v=1.0.4"></script>
+    <script src="scripts/admin.js?v=1.0.5"></script>
     <script>
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar-container');

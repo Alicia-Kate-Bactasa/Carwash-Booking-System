@@ -19,10 +19,7 @@
             }
         }
     </script>
-    <!-- Supabase JS Client SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-    <script src="scripts/supabaseClient.js"></script>
+    <!-- Supabase SDK is loaded once near the end of <body>, before the page scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const user = await getCurrentUser();
@@ -523,7 +520,7 @@
     <script src="config.js"></script>
     <script src="scripts/supabaseClient.js"></script>
     <script src="scripts/modals.js"></script>
-    <script src="scripts/dashboard.js?v=1.1.2"></script>
+    <script src="scripts/dashboard.js?v=1.1.3"></script>
     <script>
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar-container');

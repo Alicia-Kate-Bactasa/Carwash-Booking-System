@@ -70,7 +70,7 @@ router.post('/', validate(submitPaymentSchema), async (req, res) => {
         amount,
         payment_method: payment_method || 'GCash',
         proof_of_payment,
-        payment_status: 'Pending Approval'
+        payment_status: 'Pending_Approval'
       }
     });
 

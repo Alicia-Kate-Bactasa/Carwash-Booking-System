@@ -17,9 +17,9 @@ router.get('/dashboard-stats', requireAuth, requireAdmin, async (req, res) => {
       paidInvoices
     ] = await Promise.all([
       prisma.booking.count(),
-      prisma.booking.count({ where: { booking_status: { in: ['Pending', 'Pending Verification'] } } }),
+      prisma.booking.count({ where: { booking_status: { in: ['Pending', 'Pending_Verification'] } } }),
       prisma.subscription.count({ where: { plan_status: 'Active' } }),
-      prisma.payment.count({ where: { payment_status: 'Pending Approval' } }),
+      prisma.payment.count({ where: { payment_status: 'Pending_Approval' } }),
       prisma.invoice.aggregate({
         where: { invoice_status: 'Paid' },
         _sum: { total_amount: true }

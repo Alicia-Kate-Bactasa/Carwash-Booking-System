@@ -85,7 +85,7 @@ model Service {
 
   bookings            Booking[]
 
-  @@map("Service")
+  @@map("services")
 }
 
 model User {
@@ -99,7 +99,7 @@ model User {
   subscriptions    Subscription[]
   security_actions UserSecurityAction[]
 
-  @@map("User")
+  @@map("user")
 }
 
 model Customer {
@@ -112,7 +112,7 @@ model Customer {
 
   bookings      Booking[]
 
-  @@map("Customer")
+  @@map("customers")
 }
 
 model Subscription {
@@ -129,7 +129,7 @@ model Subscription {
   user                     User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   invoices                 Invoice[]
 
-  @@map("Subscription")
+  @@map("subscriptions")
 }
 
 model Booking {
@@ -150,7 +150,7 @@ model Booking {
   feedback          Feedback?
   invoices          Invoice[]
 
-  @@map("Booking")
+  @@map("bookings")
 }
 
 model Feedback {
@@ -162,7 +162,7 @@ model Feedback {
 
   booking     Booking?  @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
 
-  @@map("Feedback")
+  @@map("feedbacks")
 }
 
 model Invoice {
@@ -178,7 +178,7 @@ model Invoice {
   subscription    Subscription? @relation(fields: [subscription_id], references: [subscription_id], onDelete: SetNull)
   payments        Payment[]
 
-  @@map("Invoice")
+  @@map("invoices")
 }
 
 model Payment {
@@ -192,7 +192,7 @@ model Payment {
 
   invoice          Invoice       @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
 
-  @@map("Payment")
+  @@map("payments")
 }
 
 model UserSecurityAction {
@@ -207,5 +207,5 @@ model UserSecurityAction {
 
   user        User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  @@map("UserSecurityAction")
+  @@map("user_security_actions")
 }

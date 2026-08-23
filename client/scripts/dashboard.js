@@ -17,17 +17,29 @@ const csrfToken = '';
         let selectedRescheduleId = null;
         let activeSubTabState = "active";
 
-        function loadSubscriberAppointments(activeProfileName) {
+        async function loadSubscriberAppointments(activeProfileName) {
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 return sb.auth.getUser().then(async ({ data: { user } }) => {
                     if (!user) {
                         return [];
                     }
+
+                    // bookings.user_id is an INT FK to public."user" — the Supabase
+                    // auth UUID must be resolved first or PostgREST returns 400.
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (!dbUser) {
+                        console.warn("Could not resolve local user record for appointments.");
+                        currentAppointments = [];
+                        historyAppointments = [];
+                        renderAppointmentsTable();
+                        return [];
+                    }
+
                     const { data, error } = await sb
                         .from('bookings')
-                        .select('*')
-                        .eq('user_id', user.id);
+                        .select('*, services(service_name)')
+                        .eq('user_id', dbUser.user_id);
 
                     if (error || !data) {
                         console.warn("Supabase bookings query empty or error:", error);
@@ -44,7 +56,7 @@ const csrfToken = '';
                         } else if (app.booking_status === 'Completed') {
                             type = 'completed';
                         }
-                        
+
                         return {
                             id: "MTG-" + app.booking_id,
                             booking_id: parseInt(app.booking_id, 10),
@@ -57,9 +69,7 @@ const csrfToken = '';
                             userType: 'subscriber'
                         };
                     });
-                    
-                    currentAppointments = mapped.filter(app => app.type === 'pending');
-                    historyAppointments = mapped.filter(app => app.type === 'completed' || app.type === 'cancelled');
+
                     currentAppointments = mapped.filter(app => app.type === 'pending');
                     historyAppointments = mapped.filter(app => app.type === 'completed' || app.type === 'cancelled');
                     renderAppointmentsTable();
@@ -437,6 +447,27 @@ const csrfToken = '';
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (!dbUser) {
+                        showErrorModal('Could not resolve your account. Please sign in again.');
+                        return;
+                    }
+
+                    // Check the target slot isn't already taken before updating.
+                    const { data: conflict } = await sb
+                        .from('bookings')
+                        .select('booking_id')
+                        .eq('scheduled_date', targetDate)
+                        .eq('time_slot', targetTime)
+                        .neq('booking_id', rawBookingId)
+                        .neq('booking_status', 'Cancelled')
+                        .neq('booking_status', 'No-Show')
+                        .limit(1);
+                    if (Array.isArray(conflict) && conflict.length > 0) {
+                        showErrorModal('That time slot is already occupied. Please choose another window.');
+                        return;
+                    }
+
                     const { error: sbErr } = await sb
                         .from('bookings')
                         .update({
@@ -446,13 +477,17 @@ const csrfToken = '';
                         })
                         .eq('booking_id', rawBookingId);
 
-                    if (!sbErr) {
-                        showErrorModal(`Appointment rescheduled successfully.`, true);
-                        toggleModal('rescheduleModal');
-                        const activeProfileName = localStorage.getItem('subscriber_name') || 'VIP Member';
-                        loadSubscriberAppointments(activeProfileName);
+                    if (sbErr) {
+                        console.error('Reschedule failed:', sbErr);
+                        showErrorModal(sbErr.message || 'Reschedule failed. Please try again.');
                         return;
                     }
+
+                    showErrorModal(`Appointment rescheduled successfully.`, true);
+                    toggleModal('rescheduleModal');
+                    const activeProfileName = localStorage.getItem('subscriber_name') || 'VIP Member';
+                    loadSubscriberAppointments(activeProfileName);
+                    return;
                 }
 
                 showErrorModal(`Appointment rescheduled successfully.`, true);
@@ -567,13 +602,32 @@ const csrfToken = '';
             const serviceId = serviceObj ? (serviceObj.service_id || 1) : 1;
 
             try {
-                let bookingIdNum = Math.floor(100000 + Math.random() * 900000);
+                let bookingIdNum = null;
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
 
                 if (sb) {
-                    const user = await getCurrentUser();
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (!dbUser) {
+                        showErrorModal('Could not resolve your account. Please sign in again.');
+                        return;
+                    }
+
+                    // Guard against double-booking the same slot/bay.
+                    const { data: conflict } = await sb
+                        .from('bookings')
+                        .select('booking_id')
+                        .eq('scheduled_date', dateVal)
+                        .eq('time_slot', activeDashTimeState)
+                        .neq('booking_status', 'Cancelled')
+                        .neq('booking_status', 'No-Show')
+                        .limit(1);
+                    if (Array.isArray(conflict) && conflict.length >= 2) {
+                        showErrorModal('That time slot is fully booked. Please select another window.');
+                        return;
+                    }
+
                     const { data: newB, error: bErr } = await sb.from('bookings').insert({
-                        user_id: user ? user.id : null,
+                        user_id: dbUser.user_id,
                         service_id: serviceId,
                         scheduled_date: dateVal,
                         time_slot: activeDashTimeState,
@@ -581,9 +635,17 @@ const csrfToken = '';
                         booking_status: 'Pending Verification'
                     }).select().single();
 
-                    if (!bErr && newB) {
-                        bookingIdNum = newB.booking_id;
+                    if (bErr || !newB) {
+                        console.error('Booking insert failed:', bErr);
+                        showErrorModal((bErr && bErr.message) || 'Failed to create booking. Please try again.');
+                        return;
                     }
+                    bookingIdNum = newB.booking_id;
+                }
+
+                if (!bookingIdNum) {
+                    showErrorModal('Booking service unavailable. Please try again later.');
+                    return;
                 }
 
                 alert(`Reservation Authorized!\n\nBooking ID: MTG-${bookingIdNum}`);
@@ -653,9 +715,66 @@ const csrfToken = '';
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
-                    const user = await getCurrentUser();
-                    if (user) {
-                        await sb.from('subscriptions').update({ plan_status: 'Payment Pending' }).eq('user_id', user.id);
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (!dbUser) {
+                        showErrorModal('Could not resolve your account. Please sign in again.');
+                        return;
+                    }
+
+                    // Upload GCash proof (best-effort — booking flow continues on failure)
+                    let proofUrl = 'pending-upload';
+                    try {
+                        const filePath = `receipts/${dbUser.user_id}_${Date.now()}_${file.name}`;
+                        const { error: uploadError } = await sb.storage
+                            .from('payment-proofs')
+                            .upload(filePath, file);
+                        if (!uploadError) {
+                            proofUrl = sb.storage.from('payment-proofs').getPublicUrl(filePath).data.publicUrl;
+                        } else {
+                            console.warn("Renewal proof upload notice:", uploadError);
+                        }
+                    } catch (upErr) {
+                        console.warn("Renewal proof upload notice:", upErr);
+                    }
+
+                    const { data: sub, error: subFetchErr } = await sb
+                        .from('subscriptions')
+                        .select('subscription_id')
+                        .eq('user_id', dbUser.user_id)
+                        .order('subscription_id', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    if (subFetchErr) throw subFetchErr;
+
+                    const { error: updErr } = await sb
+                        .from('subscriptions')
+                        .update({ plan_status: 'Payment Pending' })
+                        .eq('subscription_id', sub.subscription_id);
+                    if (updErr) {
+                        console.error('Renewal status update failed:', updErr);
+                        showErrorModal(updErr.message || 'Failed to submit renewal. Please try again.');
+                        return;
+                    }
+
+                    // Record the renewal invoice + payment proof so admin can verify it.
+                    try {
+                        const { data: inv, error: invErr } = await sb.from('invoices').insert({
+                            subscription_id: sub.subscription_id,
+                            total_amount: 1500.00,
+                            invoice_type: 'Monthly Roster',
+                            invoice_status: 'Pending'
+                        }).select().single();
+                        if (!invErr && inv) {
+                            await sb.from('payments').insert({
+                                invoice_id: inv.invoice_id,
+                                amount: 1500.00,
+                                payment_method: 'GCash',
+                                payment_status: 'Pending Approval',
+                                proof_of_payment: proofUrl
+                            });
+                        }
+                    } catch (ledgerErr) {
+                        console.warn("Renewal ledger notice:", ledgerErr);
                     }
                 }
                 const successMsg = isReactivation 
@@ -683,12 +802,16 @@ const csrfToken = '';
                             .update({ booking_status: 'Cancelled', status_updated_at: new Date().toISOString() })
                             .eq('booking_id', rawBookingId);
 
-                        if (!sbErr) {
-                            await alert("Appointment cancelled successfully.");
-                            const activeProfileName = localStorage.getItem('subscriber_name') || 'VIP Member';
-                            loadSubscriberAppointments(activeProfileName);
+                        if (sbErr) {
+                            console.error('Cancellation failed:', sbErr);
+                            await alert(sbErr.message || 'Failed to cancel the appointment. Please try again.');
                             return;
                         }
+
+                        await alert("Appointment cancelled successfully.");
+                        const activeProfileName = localStorage.getItem('subscriber_name') || 'VIP Member';
+                        loadSubscriberAppointments(activeProfileName);
+                        return;
                     }
 
                     await alert("Appointment cancelled successfully.");
@@ -696,9 +819,7 @@ const csrfToken = '';
                     loadSubscriberAppointments(activeProfileName);
                 } catch (err) {
                     console.error("Cancellation error:", err);
-                    await alert("Appointment cancelled successfully.");
-                    const activeProfileName = localStorage.getItem('subscriber_name') || 'VIP Member';
-                    loadSubscriberAppointments(activeProfileName);
+                    await alert('An error occurred while cancelling. Please try again.');
                 }
             }
         }
@@ -708,16 +829,31 @@ const csrfToken = '';
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
-                    const user = await getCurrentUser();
-                    if (user) {
-                        await sb.from('subscriptions').update({ plan_status: 'Cancellation Pending' }).eq('user_id', user.id);
-                    }
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (!dbUser) throw new Error('no local user');
+
+                    // subscriptions.user_id is an INT FK — resolve via subscription row
+                    const { data: sub } = await sb
+                        .from('subscriptions')
+                        .select('subscription_id')
+                        .eq('user_id', dbUser.user_id)
+                        .order('subscription_id', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    const { error: updErr } = await sb
+                        .from('subscriptions')
+                        .update({ plan_status: 'Cancellation Pending' })
+                        .eq('subscription_id', sub.subscription_id);
+                    if (updErr) throw updErr;
                 }
                 await alert("Subscription cancellation requested successfully.");
                 location.reload();
             } catch (err) {
-                await alert("Subscription cancellation requested successfully.");
-                location.reload();
+                console.error("Downgrade error:", err);
+                await alert(err.message && err.message !== 'no local user'
+                    ? `Cancellation request failed: ${err.message}`
+                    : "Cancellation request failed. Please try again.");
             }
         }
 
@@ -762,22 +898,53 @@ const csrfToken = '';
             }
         }
 
-        function syncProfileWithDatabase() {
+        async function syncProfileWithDatabase() {
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
-            if (sb) {
-                getUserProfile().then(prof => {
-                    if (prof) {
-                        userProfileSession.name = prof.full_name || localStorage.getItem('subscriber_name') || 'VIP Member';
-                        userProfileSession.customer_type = 'Subscriber';
-                        const restrictedNotice = document.getElementById('bookingRestrictedNotice');
-                        if (restrictedNotice) restrictedNotice.classList.add('hidden');
-                        const welcomeName = document.getElementById('dashWelcomeName');
-                        if (welcomeName) welcomeName.innerText = userProfileSession.name;
-                        const subName = document.getElementById('subParamName');
-                        if (subName) subName.innerText = userProfileSession.name;
-                        renderSynchronizedComponents();
-                    }
-                }).catch(err => console.warn("Profile sync notice:", err));
+            if (!sb) return;
+
+            try {
+                const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                if (!dbUser) return;
+
+                const { data: sub } = await sb
+                    .from('subscriptions')
+                    .select('subscription_id, plan_tier, plan_status, created_at, last_billing_date, next_billing_date')
+                    .eq('user_id', dbUser.user_id)
+                    .order('subscription_id', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                userProfileSession.name = localStorage.getItem('subscriber_name') || 'VIP Member';
+                const isActive = !!(sub && sub.plan_status === 'Active');
+                userProfileSession.customer_type = isActive ? 'Subscriber' : 'Inactive Member';
+
+                if (isActive) {
+                    const restrictedNotice = document.getElementById('bookingRestrictedNotice');
+                    if (restrictedNotice) restrictedNotice.classList.add('hidden');
+                }
+
+                const welcomeName = document.getElementById('dashWelcomeName');
+                if (welcomeName) welcomeName.innerText = userProfileSession.name;
+                const subName = document.getElementById('subParamName');
+                if (subName) subName.innerText = userProfileSession.name;
+
+                // Subscription panel fields
+                const subTier = document.getElementById('subParamType');
+                if (subTier) subTier.innerText = sub ? (sub.plan_tier || 'Unlimited Basic Wash') : 'No Plan';
+                const createdAtEl = document.getElementById('subParamCreatedAt');
+                if (createdAtEl) createdAtEl.innerText = sub?.created_at ? new Date(sub.created_at).toLocaleDateString() : '—';
+                const lastBillingEl = document.getElementById('subParamLastBilling');
+                if (lastBillingEl) lastBillingEl.innerText = sub?.last_billing_date || '—';
+                const nextBillingEl = document.getElementById('subParamNextBilling');
+                userProfileSession.next_billing_date = sub?.next_billing_date || 'Awaiting Payment Approval';
+                if (nextBillingEl) nextBillingEl.innerText = userProfileSession.next_billing_date;
+
+                renderSynchronizedComponents();
+                if (typeof updateRenewalButtonState === 'function') {
+                    updateRenewalButtonState(sub || {});
+                }
+            } catch (err) {
+                console.warn("Profile sync notice:", err);
             }
         }
 
@@ -892,12 +1059,21 @@ const csrfToken = '';
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 const numericBookingId = parseInt(booking_id_raw.replace(/\D/g, ''), 10);
-                if (sb && !isNaN(numericBookingId)) {
-                    await sb.from('feedbacks').insert({
+                if (sb) {
+                    if (isNaN(numericBookingId)) {
+                        showErrorModal('Invalid Booking ID format. Please use your MTG reference number.');
+                        return;
+                    }
+                    const { error: fbErr } = await sb.from('feedbacks').insert({
                         booking_id: numericBookingId,
                         rating: rating,
                         comments: comments
                     });
+                    if (fbErr) {
+                        console.error('Feedback submit failed:', fbErr);
+                        showErrorModal(fbErr.message || 'Unable to submit feedback right now. Please try again.');
+                        return;
+                    }
                 }
                 showErrorModal('Thank you! Your feedback has been submitted successfully.', true);
                 document.getElementById('feedbackForm').reset();
@@ -908,8 +1084,8 @@ const csrfToken = '';
                 setFeedbackRating(5);
                 toggleModal('feedbackModal');
             } catch (err) {
-                showErrorModal('Thank you! Your feedback has been submitted successfully.', true);
-                toggleModal('feedbackModal');
+                console.error('Feedback error:', err);
+                showErrorModal(err.message || 'Unable to submit feedback right now. Please try again.');
             }
         }
 

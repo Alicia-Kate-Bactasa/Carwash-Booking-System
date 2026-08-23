@@ -40,24 +40,72 @@ async function getCurrentUser() {
 }
 
 /**
- * Gets the detailed user profile from public.profiles table.
+ * Gets the detailed user profile from the local public."user" table
+ * (public.profiles does not exist in this database).
  */
 async function getUserProfile() {
+    const dbUser = await getCurrentDbUser();
+    if (!dbUser) return null;
+
     const user = await getCurrentUser();
     if (!user) return null;
 
-    const sb = getSupabase();
-    const { data: profile, error } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    return { id: user.id, email: user.email, ...dbUser };
+}
 
-    if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
+/**
+ * Resolves the local integer-backed application user for the signed-in
+ * Supabase auth user.
+ *
+ * bookings.user_id and subscriptions.user_id are INT foreign keys to
+ * public."user"(user_id) — the Supabase auth UUID must NEVER be used in
+ * those columns (PostgREST rejects it with a 400 type error).
+ *
+ * The row is found by JWT email (RLS scoped to the owner) and provisioned
+ * on first login. Result is cached per browser session.
+ */
+async function getCurrentDbUser() {
+    const user = await getCurrentUser();
+    if (!user || !user.email) return null;
+
+    const cacheKey = 'montage_db_user_' + user.id;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+        try { return JSON.parse(cached); } catch (e) { /* refetch below */ }
     }
-    return { ...user, ...profile };
+
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    const { data: existing } = await sb
+        .from('user')
+        .select('user_id, email, username, role')
+        .eq('email', user.email)
+        .maybeSingle();
+
+    let dbUser = existing;
+    if (!dbUser) {
+        // First login with this email: provision the local row (scoped RLS
+        // policy only permits inserting our own email).
+        const fallbackUsername = user.email.split('@')[0] + '-' + Date.now().toString(36);
+        await sb.from('user').insert({
+            email: user.email,
+            username: fallbackUsername,
+            password: 'supabase-managed',
+            role: 'Customer'
+        });
+        const { data: created } = await sb
+            .from('user')
+            .select('user_id, email, username, role')
+            .eq('email', user.email)
+            .maybeSingle();
+        dbUser = created;
+    }
+
+    if (dbUser) {
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(dbUser)); } catch (e) { /* ignore */ }
+    }
+    return dbUser || null;
 }
 
 /**
@@ -77,4 +125,5 @@ async function signOutUser(redirectUrl = 'index.html') {
 window.getSupabase = getSupabase;
 window.getCurrentUser = getCurrentUser;
 window.getUserProfile = getUserProfile;
+window.getCurrentDbUser = getCurrentDbUser;
 window.signOutUser = signOutUser;

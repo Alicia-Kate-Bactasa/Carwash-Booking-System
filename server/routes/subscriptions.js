@@ -40,13 +40,16 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const dbUser = await prisma.user.findUnique({
-      where: { email: req.user.email }
+    const dbUser = await prisma.user.upsert({
+      where: { email: req.user.email },
+      update: {},
+      create: {
+        email: req.user.email,
+        username: req.user.email.split('@')[0] + '-' + Date.now().toString(36),
+        password: 'supabase-managed',
+        role: 'Customer'
+      }
     });
-
-    if (!dbUser) {
-      return res.status(404).json({ status: 'error', message: 'User profile not found.' });
-    }
 
     const subscription = await prisma.subscription.findFirst({
       where: { user_id: dbUser.user_id },
@@ -75,7 +78,7 @@ router.post('/renew', requireAuth, async (req, res) => {
   try {
     const { plan_tier } = req.body;
     const tierName = plan_tier || 'Unlimited Basic Wash';
-    const renewalAmount = 1499.00; // Monthly subscription rate
+    const renewalAmount = 1500.00; // Monthly subscription rate
 
     const dbUser = await prisma.user.findUnique({
       where: { email: req.user.email }
@@ -95,13 +98,13 @@ router.post('/renew', requireAuth, async (req, res) => {
           data: {
             user_id: dbUser.user_id,
             plan_tier: tierName,
-            plan_status: 'Payment Pending'
+            plan_status: 'Payment_Pending'
           }
         });
       } else {
         await tx.subscription.update({
           where: { subscription_id: sub.subscription_id },
-          data: { plan_status: 'Payment Pending', plan_tier: tierName }
+          data: { plan_status: 'Payment_Pending', plan_tier: tierName }
         });
       }
 
@@ -110,7 +113,7 @@ router.post('/renew', requireAuth, async (req, res) => {
         data: {
           subscription_id: sub.subscription_id,
           total_amount: renewalAmount,
-          invoice_type: 'Monthly Roster',
+          invoice_type: 'Monthly_Roster',
           invoice_status: 'Pending'
         }
       });

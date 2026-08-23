@@ -186,17 +186,19 @@
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data: bData } = await sb.from('bookings')
-                        .select('time_slot, end_time_slot, booking_status')
+                    // NOTE: bookings has no end_time_slot column (PostgREST returns
+                    // error 42703 if selected). Each active booking occupies a
+                    // standard 60-minute window starting at its time_slot.
+                    const { data: bData, error: bErr } = await sb.from('bookings')
+                        .select('time_slot, booking_status')
                         .eq('scheduled_date', dateInput);
+                    if (bErr) throw bErr;
                     if (bData) {
                         existingBookings = bData
                             .filter(b => b.booking_status !== 'Cancelled' && b.booking_status !== 'No-Show')
                             .map(b => {
                                 const bStart = parseTimeToMinutes(b.time_slot);
-                                const bDuration = currentDurationMins;
-                                const bEnd = b.end_time_slot ? parseTimeToMinutes(b.end_time_slot) : (bStart + bDuration);
-                                return { start: bStart, end: bEnd };
+                                return { start: bStart, end: bStart + 60 };
                             });
                     }
                 } catch (err) {
@@ -393,53 +395,94 @@
                 submitBtn.innerText = 'Submitting Booking...';
             }
 
-            const formData = new FormData();
-            formData.append('name', clientName);
-            formData.append('phone', clientPhone);
-            formData.append('email', clientEmail);
-            formData.append('service_name', activeServiceState);
-            formData.append('date', selectedDate);
-            formData.append('time', activeTimeState);
-            formData.append('proof_of_payment', paymentProofFile);
-
             try {
                 let bookingRef = "MTG-" + Math.floor(100000 + Math.random() * 900000);
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
-                
+
                 if (sb) {
                     try {
                         let customerId = null;
-                        const { data: existingCust } = await sb.from('customers').select('customer_id').eq('phone_number', clientPhone).maybeSingle();
+                        const { data: existingCust, error: custErr } = await sb.from('customers').select('customer_id').eq('phone_number', clientPhone).maybeSingle();
+                        if (custErr) throw custErr;
                         if (existingCust) {
                             customerId = existingCust.customer_id;
                         } else {
-                            const { data: newCust } = await sb.from('customers').insert({
+                            const { data: newCust, error: newCustErr } = await sb.from('customers').insert({
                                 full_name: clientName,
                                 phone_number: clientPhone,
                                 email: clientEmail || null,
                                 customer_type: 'Regular'
                             }).select().single();
+                            if (newCustErr) throw newCustErr;
                             if (newCust) customerId = newCust.customer_id;
                         }
 
                         let serviceId = 1;
-                        const { data: srvData } = await sb.from('services').select('service_id, service_price').eq('service_name', activeServiceState).maybeSingle();
-                        if (srvData) serviceId = srvData.service_id;
+                        let servicePrice = activeServicePrice;
+                        const { data: srvData, error: srvErr } = await sb.from('services').select('service_id, service_price').eq('service_name', activeServiceState).maybeSingle();
+                        if (srvErr) throw srvErr;
+                        if (srvData) {
+                            serviceId = srvData.service_id;
+                            servicePrice = parseFloat(srvData.service_price) || activeServicePrice;
+                        }
 
-                        const { data: newBooking } = await sb.from('bookings').insert({
+                        // Upload GCash proof of payment (best-effort)
+                        let proofUrl = 'pending-upload';
+                        if (paymentProofFile && sb.storage) {
+                            try {
+                                const filePath = `receipts/guest_${Date.now()}_${paymentProofFile.name}`;
+                                const { error: uploadError } = await sb.storage
+                                    .from('payment-proofs')
+                                    .upload(filePath, paymentProofFile);
+                                if (!uploadError) {
+                                    proofUrl = sb.storage.from('payment-proofs').getPublicUrl(filePath).data.publicUrl;
+                                } else {
+                                    console.warn("Proof upload notice:", uploadError);
+                                }
+                            } catch (upErr) {
+                                console.warn("Proof upload notice:", upErr);
+                            }
+                        }
+
+                        const { data: newBooking, error: bookingErr } = await sb.from('bookings').insert({
                             customer_id: customerId,
                             service_id: serviceId,
                             scheduled_date: selectedDate,
                             time_slot: activeTimeState,
-                            purchased_price: activeServicePrice || (srvData ? srvData.service_price : 250),
+                            purchased_price: servicePrice,
                             booking_status: 'Pending Verification'
                         }).select().single();
+                        if (bookingErr) throw bookingErr;
 
                         if (newBooking) {
                             bookingRef = "MTG-" + newBooking.booking_id;
+
+                            // Create the linked invoice + payment record so admin can
+                            // verify the proof (mirrors backend POST /bookings behavior).
+                            try {
+                                const { data: invData, error: invErr } = await sb.from('invoices').insert({
+                                    booking_id: newBooking.booking_id,
+                                    total_amount: servicePrice,
+                                    invoice_type: 'Single Detailing',
+                                    invoice_status: 'Pending'
+                                }).select().single();
+                                if (!invErr && invData) {
+                                    await sb.from('payments').insert({
+                                        invoice_id: invData.invoice_id,
+                                        amount: servicePrice,
+                                        payment_method: 'GCash',
+                                        payment_status: 'Pending Approval',
+                                        proof_of_payment: proofUrl
+                                    });
+                                }
+                            } catch (invStepErr) {
+                                console.warn("Invoice/payment record notice:", invStepErr);
+                            }
                         }
                     } catch (sbErr) {
-                        console.warn("Supabase guest booking notice:", sbErr);
+                        console.error("Guest booking error:", sbErr);
+                        showErrorModal(sbErr.message || 'Failed to save your booking. Please try again.');
+                        return;
                     }
                 }
 
@@ -502,14 +545,22 @@
                         throw new Error(authError.message || 'Authentication failed.');
                     }
                     const user = authData.user;
-                    const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
-                    const role = profile ? profile.role : (user.user_metadata?.role || 'Customer');
+
+                    // Resolve role from the local integer-backed user row
+                    // (public.profiles does not exist; RLS scopes the row to its owner).
+                    let role = user.user_metadata?.role === 'Admin' ? 'Admin' : 'Customer';
+                    let fullName = '';
+                    const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                    if (dbUser) {
+                        if (dbUser.role) role = dbUser.role;
+                        fullName = dbUser.username || '';
+                    }
 
                     toggleModal('loginModal');
                     if (role === 'Admin') {
                         window.location.href = 'admin.html';
                     } else {
-                        const nameVal = profile?.full_name || user.email.split('@')[0].toUpperCase();
+                        const nameVal = fullName || (user.email.split('@')[0].toUpperCase());
                         const emailVal = user.email;
                         localStorage.setItem('subscriber_session_active', 'true');
                         localStorage.setItem('subscriber_name', nameVal);
@@ -586,19 +637,8 @@
                 return;
             }
 
-            // Check if active subscriber account already exists in Supabase
-            try {
-                const sb = typeof getSupabase === 'function' ? getSupabase() : null;
-                if (sb) {
-                    const { data: existingProfile } = await sb.from('profiles').select('id, user_role, subscription_status').eq('email', emailVal).maybeSingle();
-                    if (existingProfile && existingProfile.user_role === 'Subscriber' && existingProfile.subscription_status === 'Active') {
-                        showErrorModal('An account with this email address already exists and is active. Please log in instead.');
-                        return;
-                    }
-                }
-            } catch (err) {
-                console.warn("Email uniqueness check notice:", err);
-            }
+            // Duplicate-email protection is enforced by Supabase Auth itself
+            // during signUp (public.profiles does not exist as a lookup table).
 
             if (!passwordVal) {
                 showErrorModal('Please enter a password.');
@@ -698,11 +738,11 @@
                         return;
                     }
 
-                    const userId = authData.user?.id;
+                    const authUserId = authData.user?.id;
                     let proofUrl = 'pending';
 
-                    if (userId && paymentProofFile && sb.storage) {
-                        const filePath = `receipts/${userId}_${Date.now()}_${paymentProofFile.name}`;
+                    if (authUserId && paymentProofFile && sb.storage) {
+                        const filePath = `receipts/${authUserId}_${Date.now()}_${paymentProofFile.name}`;
                         const { data: uploadData, error: uploadError } = await sb.storage
                             .from('payment-proofs')
                             .upload(filePath, paymentProofFile);
@@ -711,22 +751,30 @@
                         }
                     }
 
-                    if (userId) {
-                        const { data: subData } = await sb.from('subscriptions').insert([{
-                            user_id: userId,
+                    // Resolve the local integer user id (subscriptions.user_id is an
+                    // INT FK — inserting the Supabase auth UUID fails with a 400).
+                    let localUserId = null;
+                    if (authUserId) {
+                        const dbUser = typeof getCurrentDbUser === 'function' ? await getCurrentDbUser() : null;
+                        localUserId = dbUser ? dbUser.user_id : null;
+                    }
+
+                    if (localUserId) {
+                        const { data: subData, error: subErr } = await sb.from('subscriptions').insert([{
+                            user_id: localUserId,
                             plan_tier: 'Unlimited Basic Wash',
                             plan_status: 'Payment Pending'
                         }]).select().single();
 
-                        if (subData) {
-                            const { data: invData } = await sb.from('invoices').insert([{
+                        if (!subErr && subData) {
+                            const { data: invData, error: invErr } = await sb.from('invoices').insert([{
                                 subscription_id: subData.subscription_id,
                                 total_amount: 1500.00,
                                 invoice_type: 'Monthly Roster',
                                 invoice_status: 'Pending'
                             }]).select().single();
 
-                            if (invData) {
+                            if (!invErr && invData) {
                                 await sb.from('payments').insert([{
                                     invoice_id: invData.invoice_id,
                                     amount: 1500.00,

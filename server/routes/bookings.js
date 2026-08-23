@@ -31,12 +31,17 @@ router.get('/', requireAuth, async (req, res) => {
 
     // Filter by user role unless admin requesting all
     if (req.user.role !== 'Admin') {
-      const dbUser = await prisma.user.findUnique({
-        where: { email: req.user.email }
+      const dbUser = await prisma.user.upsert({
+        where: { email: req.user.email },
+        update: {},
+        create: {
+          email: req.user.email,
+          username: req.user.email.split('@')[0] + '-' + Date.now().toString(36),
+          password: 'supabase-managed',
+          role: 'Customer'
+        }
       });
-      if (dbUser) {
-        where.user_id = dbUser.user_id;
-      }
+      where.user_id = dbUser.user_id;
     }
 
     if (status) {
@@ -86,7 +91,7 @@ router.get('/availability', async (req, res) => {
       where: {
         scheduled_date: new Date(date),
         booking_status: {
-          notIn: ['Cancelled', 'No-Show']
+          notIn: ['Cancelled', 'No_Show']
         }
       },
       select: {
@@ -136,7 +141,7 @@ router.post('/', validate(createBookingSchema), async (req, res) => {
         scheduled_date: new Date(scheduled_date),
         time_slot,
         bay_number,
-        booking_status: { notIn: ['Cancelled', 'No-Show'] }
+        booking_status: { notIn: ['Cancelled', 'No_Show'] }
       }
     });
 
@@ -183,7 +188,7 @@ router.post('/', validate(createBookingSchema), async (req, res) => {
       targetCustomerId = customer.customer_id;
     }
 
-    const bookingStatus = isSubscriber ? 'Pending' : 'Pending Verification';
+    const bookingStatus = isSubscriber ? 'Pending' : 'Pending_Verification';
     const purchasedPrice = service.service_price;
 
     // 4. Perform atomic transaction: Create Booking & Invoice
@@ -210,7 +215,7 @@ router.post('/', validate(createBookingSchema), async (req, res) => {
           booking_id: newBooking.booking_id,
           subscription_id: subscriptionId,
           total_amount: invoiceAmount,
-          invoice_type: 'Single Detailing',
+          invoice_type: 'Single_Detailing',
           invoice_status: invoiceStatus
         }
       });
@@ -270,7 +275,7 @@ router.put('/:id/reschedule', requireAuth, async (req, res) => {
         scheduled_date: new Date(scheduled_date),
         time_slot,
         bay_number: bay_number || booking.bay_number,
-        booking_status: { notIn: ['Cancelled', 'No-Show'] }
+        booking_status: { notIn: ['Cancelled', 'No_Show'] }
       }
     });
 

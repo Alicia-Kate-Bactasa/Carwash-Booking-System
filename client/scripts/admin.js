@@ -31,9 +31,11 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
+                    // Embed related service/customer names (flat select('*') has no
+                    // relations, so app.services / app.customers were always undefined).
                     const { data, error } = await sb
                         .from('bookings')
-                        .select('*');
+                        .select('*, services(service_name), customers(full_name)');
 
                     if (!error && Array.isArray(data)) {
                         appointmentsRegistry = data.map(app => {
@@ -43,7 +45,7 @@ const defaultServices = [];
                             } else if (app.booking_status === 'Completed') {
                                 type = 'completed';
                             }
-                            const clientName = app.profiles?.full_name || app.customers?.full_name || 'Client';
+                            const clientName = app.customers?.full_name || 'Client';
                             return {
                                 id: "MTG-" + app.booking_id,
                                 booking_id: parseInt(app.booking_id, 10),
@@ -58,6 +60,7 @@ const defaultServices = [];
                         renderBookingSlideData();
                         return;
                     }
+                    if (error) console.warn("Bookings fetch error:", error);
                 } catch (sbErr) {
                     console.warn("Supabase bookings fetch failed, trying API fallback:", sbErr);
                 }
@@ -71,13 +74,49 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data } = await sb.from('invoices').select('*');
-                    if (data) {
-                        invoicesCollection = data;
+                    // Map raw rows into the shape the ledger tables expect
+                    // (invoice_status / total_amount / issued_at — the old code read
+                    // nonexistent inv.status / inv.total / inv.type fields so both
+                    // ledgers rendered empty forever).
+                    const { data, error } = await sb.from('invoices').select(`
+                        invoice_id,
+                        booking_id,
+                        subscription_id,
+                        total_amount,
+                        issued_at,
+                        invoice_type,
+                        invoice_status,
+                        bookings(booking_id, services(service_name), customers(full_name)),
+                        payments(payment_id, proof_of_payment, payment_status)
+                    `).order('invoice_id', { ascending: false });
+
+                    if (!error && Array.isArray(data)) {
+                        invoicesCollection = data.map(inv => {
+                            const bk = Array.isArray(inv.bookings) ? inv.bookings[0] : inv.bookings;
+                            const pays = Array.isArray(inv.payments) ? inv.payments : [];
+                            const isMembership = inv.invoice_type === 'Monthly Roster';
+                            const totalVal = parseFloat(inv.total_amount) || 0;
+                            const type = isMembership ? 'membership' : (totalVal === 0 ? 'subscriber-free' : 'regular');
+                            return {
+                                id: 'INV-' + inv.invoice_id,
+                                invoice_id: inv.invoice_id,
+                                booking_id: bk?.booking_id || null,
+                                subscription_id: inv.subscription_id || null,
+                                client: bk?.customers?.full_name || (isMembership ? 'Subscriber Member' : 'Walk-in Client'),
+                                service: isMembership ? 'Monthly Roster' : (bk?.services?.service_name || 'Detailing'),
+                                total: totalVal,
+                                date: inv.issued_at ? new Date(inv.issued_at).toLocaleDateString() : '—',
+                                status: (inv.invoice_status || '').toLowerCase(),
+                                img: pays.find(p => p.proof_of_payment)?.proof_of_payment || '',
+                                type: type,
+                                payments: pays.map(p => ({ id: p.payment_id, status: p.payment_status }))
+                            };
+                        });
                         renderInvoicePendingTable();
                         renderArchiveLedgerTable();
                         return;
                     }
+                    if (error) console.warn("Invoices query error:", error);
                 } catch (e) {
                     console.warn("Supabase invoices query notice:", e);
                 }
@@ -99,42 +138,25 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    // Fetch ONLY active/verified subscriptions for Directory
-                    const { data: subsData } = await sb.from('subscriptions').select('*').eq('plan_status', 'Active');
-                    const { data: profData } = await sb.from('profiles').select('*').eq('subscription_status', 'Active');
+                    // Fetch ONLY active subscriptions for Directory.
+                    // NOTE: public.profiles does not exist; subscriber contact info
+                    // comes from the locally synced approval records below.
+                    const { data: subsData, error: subsErr } = await sb
+                        .from('subscriptions')
+                        .select('subscription_id, user_id, plan_tier, plan_status, next_billing_date')
+                        .eq('plan_status', 'Active');
 
-                    if (Array.isArray(subsData)) {
+                    if (!subsErr && Array.isArray(subsData)) {
                         subsData.forEach(sub => {
-                            const uid = sub.user_id || sub.profiles?.id;
-                            const emailVal = sub.profiles?.email || '';
-                            if (uid) seenIds.add(uid);
-                            if (emailVal) seenEmails.add(emailVal.toLowerCase());
+                            if (sub.subscription_id) seenIds.add('sub-' + sub.subscription_id);
                             list.push({
                                 subscriber_id: sub.subscription_id,
-                                name: sub.profiles?.full_name || sub.profiles?.email || 'Subscriber Member',
-                                email: emailVal,
-                                next_billing_date: sub.renews_at || new Date(Date.now() + 30*86400000).toISOString().split('T')[0],
+                                name: 'Subscriber Member',
+                                email: '',
+                                next_billing_date: sub.next_billing_date || new Date(Date.now() + 30*86400000).toISOString().split('T')[0],
                                 status: 'Verified',
-                                proof_image: sub.proof_url || '../assets/gcashQR.jpg'
+                                proof_image: '../assets/gcashQR.jpg'
                             });
-                        });
-                    }
-
-                    if (Array.isArray(profData)) {
-                        profData.forEach(prof => {
-                            const emailVal = prof.email || '';
-                            if (!seenIds.has(prof.id) && (!emailVal || !seenEmails.has(emailVal.toLowerCase()))) {
-                                seenIds.add(prof.id);
-                                if (emailVal) seenEmails.add(emailVal.toLowerCase());
-                                list.push({
-                                    subscriber_id: prof.id,
-                                    name: prof.full_name || prof.email || 'Subscriber Member',
-                                    email: emailVal,
-                                    next_billing_date: new Date(Date.now() + 30*86400000).toISOString().split('T')[0],
-                                    status: 'Verified',
-                                    proof_image: '../assets/gcashQR.jpg'
-                                });
-                            }
                         });
                     }
                 } catch (e) {
@@ -142,12 +164,12 @@ const defaultServices = [];
                 }
             }
 
-            // Sync approved members from local shared state
+            // Sync approved members from local shared state (fills names/emails)
             const localApproved = JSON.parse(localStorage.getItem('montage_approved_subscribers')) || [];
             localApproved.forEach(acc => {
                 const eLower = (acc.email || '').toLowerCase();
-                if (eLower && !seenEmails.has(eLower)) {
-                    seenEmails.add(eLower);
+                if ((eLower && !seenEmails.has(eLower)) || acc.subscriber_id) {
+                    if (eLower) seenEmails.add(eLower);
                     list.push(acc);
                 }
             });
@@ -163,34 +185,40 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data } = await sb.from('subscriptions').select('*').or('plan_status.eq.Payment Pending,plan_status.eq.Pending');
-                    if (Array.isArray(data)) {
+                    // NOTE: use an IN filter — the previous PostgREST .or() string sent
+                    // plan_status.eq.Pending which is not a valid enum value (400).
+                    const { data, error } = await sb
+                        .from('subscriptions')
+                        .select('subscription_id, user_id, plan_tier, plan_status, created_at')
+                        .in('plan_status', ['Payment Pending']);
+
+                    if (!error && Array.isArray(data)) {
                         data.forEach(sub => {
-                            const eVal = sub.profiles?.email || '';
-                            if (eVal) seenEmails.add(eVal.toLowerCase());
                             list.push({
                                 id: `SUB-${sub.subscription_id}`,
                                 subscription_id: sub.subscription_id,
-                                user_id: sub.user_id || sub.profiles?.id,
-                                name: sub.profiles?.full_name || sub.profiles?.email || 'Candidate Subscriber',
-                                email: eVal,
-                                phone: sub.profiles?.phone_number || 'N/A',
-                                proof_image: sub.proof_url || '../assets/gcashQR.jpg',
+                                user_id: sub.user_id || null,
+                                name: 'Candidate Subscriber',
+                                email: '',
+                                phone: 'N/A',
+                                proof_image: '../assets/gcashQR.jpg',
                                 created_at: sub.created_at,
                                 payment_type: 'Subscription Plan'
                             });
                         });
+                    } else if (error) {
+                        console.warn("Pending subs query error:", error);
                     }
                 } catch (e) {
                     console.warn("Supabase pending subs query notice:", e);
                 }
             }
 
-            // Sync pending registrations from local shared state
+            // Sync pending registrations from local shared state (fills names/emails/proofs)
             const localPending = JSON.parse(localStorage.getItem('montage_pending_subscriptions')) || [];
             localPending.forEach(p => {
                 const eLower = (p.email || '').toLowerCase();
-                if (eLower && !seenEmails.has(eLower)) {
+                if (!seenEmails.has(eLower)) {
                     seenEmails.add(eLower);
                     list.push(p);
                 }
@@ -250,9 +278,9 @@ const defaultServices = [];
             if (activePaymentFilter === 'regular') {
                 return inv.type === 'regular';
             } else if (activePaymentFilter === 'membership') {
-                return inv.type === 'subscriber' && inv.total === 1500;
+                return inv.type === 'membership';
             } else if (activePaymentFilter === 'subscriber-free') {
-                return inv.type === 'subscriber' && inv.total === 0;
+                return inv.type === 'subscriber-free';
             }
             return false;
         }
@@ -357,13 +385,22 @@ const defaultServices = [];
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
+                    // public.profiles does not exist — activation is driven purely
+                    // through subscriptions.plan_status.
                     if (req.subscription_id) {
-                        await sb.from('subscriptions').update({ plan_status: 'Active' }).eq('subscription_id', req.subscription_id);
+                        const { error: updErr } = await sb.from('subscriptions').update({ plan_status: 'Active' }).eq('subscription_id', req.subscription_id);
+                        if (updErr) {
+                            console.error("Subscription approval failed:", updErr);
+                            alert(`Approval failed: ${updErr.message}`);
+                            return;
+                        }
                     }
-                    if (req.user_id) {
-                        await sb.from('profiles').update({ subscription_status: 'Active', user_role: 'Subscriber' }).eq('id', req.user_id);
-                    } else if (req.email) {
-                        await sb.from('profiles').update({ subscription_status: 'Active', user_role: 'Subscriber' }).eq('email', req.email);
+                    // Also mark this subscription's pending renewal invoice as Paid
+                    const linkedInvoice = invoicesCollection.find(inv =>
+                        inv.type === 'membership' && inv.status === 'pending' &&
+                        req.subscription_id && inv.subscription_id === req.subscription_id);
+                    if (linkedInvoice) {
+                        await evaluateRemittanceRoute(linkedInvoice.id, 'Paid', { silent: true });
                     }
                 }
 
@@ -411,15 +448,19 @@ const defaultServices = [];
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb && req.subscription_id) {
-                    await sb.from('subscriptions').update({ plan_status: 'Expired' }).eq('subscription_id', req.subscription_id);
+                    // 'Expired' is a valid plan_status enum value ('Inactive' is not).
+                    const { error: updErr } = await sb.from('subscriptions').update({ plan_status: 'Expired' }).eq('subscription_id', req.subscription_id);
+                    if (updErr) {
+                        console.error("Subscription rejection failed:", updErr);
+                        alert(`Rejection failed: ${updErr.message}`);
+                        return;
+                    }
                 }
                 alert(`Subscription request for ${req.name} has been rejected.`);
                 loadPendingSubscriptions();
                 loadSubscribers();
             } catch (err) {
-                alert(`Subscription request for ${req.name} has been rejected.`);
-                loadPendingSubscriptions();
-                loadSubscribers();
+                alert(`Failed to reject subscription request: ${err.message}`);
             }
         }
 
@@ -564,14 +605,19 @@ const defaultServices = [];
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
-                    await sb.from('bookings').update({ booking_status: backendStatus }).eq('booking_id', rawId);
+                    const { error: updErr } = await sb.from('bookings').update({ booking_status: backendStatus }).eq('booking_id', rawId);
+                    if (updErr) {
+                        console.error("Booking status update failed:", updErr);
+                        alert(`Failed to update booking ${bookingId}: ${updErr.message}`);
+                        return;
+                    }
                 }
                 booking.type = newStatus;
                 renderBookingSlideData();
                 executeAutomatedComplianceAuditLoop();
             } catch (err) {
-                booking.type = newStatus;
-                renderBookingSlideData();
+                console.error("updateBookingStatus exception:", err);
+                alert(`Failed to update booking ${bookingId}: ${err.message}`);
             }
         }
         window.updateBookingStatus = updateBookingStatus;
@@ -703,22 +749,37 @@ const defaultServices = [];
             toggleModal('lightboxModal');
         }
 
-        async function evaluateRemittanceRoute(invoiceId, resolutionStatus) {
-            const rawId = parseInt(invoiceId.replace(/\D/g, ''), 10);
+        async function evaluateRemittanceRoute(invoiceId, resolutionStatus, opts = {}) {
+            const rawId = parseInt(String(invoiceId).replace(/\D/g, ''), 10);
+            const inv = invoicesCollection.find(i => i.invoice_id === rawId);
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb) {
-                    await sb.from('invoices').update({ invoice_status: resolutionStatus }).eq('invoice_id', rawId);
+                    // 'Paid' / 'Rejected' are valid invoice_status enum values.
+                    const { error: invErr } = await sb.from('invoices').update({ invoice_status: resolutionStatus }).eq('invoice_id', rawId);
+                    if (invErr) throw invErr;
+
+                    // Keep the linked payment proofs in sync.
+                    if (Array.isArray(inv?.payments) && inv.payments.length > 0 && resolutionStatus !== 'Pending') {
+                        const payIds = inv.payments.map(p => p.id);
+                        await sb.from('payments').update({ payment_status: resolutionStatus }).in('payment_id', payIds);
+                    }
+
+                    // Approving a service invoice confirms its booking (mirrors the
+                    // backend PUT /payments/:id/approve transaction).
+                    if (resolutionStatus === 'Paid' && inv?.booking_id) {
+                        await sb.from('bookings').update({ booking_status: 'Confirmed' }).eq('booking_id', inv.booking_id);
+                    }
                 }
-                alert(`Payment status for ${invoiceId} updated to ${resolutionStatus}.`);
+                if (!opts.silent) {
+                    alert(`Payment status for ${invoiceId} updated to ${resolutionStatus}.`);
+                }
                 loadInvoices();
                 loadSubscribers();
                 loadAppointments();
             } catch (err) {
-                alert(`Payment status for ${invoiceId} updated to ${resolutionStatus}.`);
-                loadInvoices();
-                loadSubscribers();
-                loadAppointments();
+                console.error("Remittance update failed:", err);
+                alert(`Failed to update payment status: ${err.message}`);
             }
         }
 
@@ -1092,13 +1153,18 @@ const defaultServices = [];
             try {
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 if (sb && acc.email) {
-                    await sb.from('subscriptions').update({ plan_status: 'Inactive' }).eq('subscription_id', rawId);
+                    // 'Expired' is a valid plan_status enum value ('Inactive' is not).
+                    const { error: updErr } = await sb.from('subscriptions').update({ plan_status: 'Expired' }).eq('subscription_id', rawId);
+                    if (updErr) {
+                        console.error("Downgrade failed:", updErr);
+                        alert(`Downgrade failed: ${updErr.message}`);
+                        return;
+                    }
                 }
                 alert(`Subscriber ${acc.name} has been manually downgraded.`);
                 loadSubscribers();
             } catch (err) {
-                alert(`Subscriber ${acc.name} has been manually downgraded.`);
-                loadSubscribers();
+                alert(`Failed to downgrade subscriber: ${err.message}`);
             }
         }
         window.downgradeSubscriber = downgradeSubscriber;
@@ -1132,8 +1198,24 @@ const defaultServices = [];
             const sb = typeof getSupabase === 'function' ? getSupabase() : null;
             if (sb) {
                 try {
-                    const { data } = await sb.from('feedbacks').select('*');
-                    if (data) feedbacks = data;
+                    // feedbacks rows have no client/service columns — pull them
+                    // through the booking relation instead.
+                    const { data, error } = await sb.from('feedbacks').select(`
+                        feedback_id,
+                        rating,
+                        comments,
+                        created_at,
+                        bookings(booking_id, customers(full_name), services(service_name))
+                    `).order('feedback_id', { ascending: false });
+                    if (!error && data) {
+                        feedbacks = data.map(fb => ({
+                            ...fb,
+                            _client: fb.bookings?.customers?.full_name || 'Customer',
+                            _service: fb.bookings?.services?.service_name || 'Detailing'
+                        }));
+                    } else if (error) {
+                        console.warn("Feedbacks fetch error:", error);
+                    }
                 } catch (e) {
                     console.warn("Feedbacks fetch notice:", e);
                 }
@@ -1147,7 +1229,9 @@ const defaultServices = [];
             }
 
             feedbacks.forEach(entry => {
-                const bookingIdText = entry.booking_id ? `MTG-${String(entry.booking_id).replace(/^MTG-/, '')}` : 'Public Feedback';
+                const bookingIdText = entry.booking_id || entry.bookings?.booking_id
+                    ? `MTG-${String(entry.booking_id || entry.bookings?.booking_id).replace(/^MTG-/, '')}`
+                    : 'Public Feedback';
                 const ratingVal = parseInt(entry.rating, 10) || 5;
                 const formattedDate = entry.created_at ? new Date(entry.created_at).toLocaleDateString('en-US', {
                     month: 'short',
@@ -1159,8 +1243,8 @@ const defaultServices = [];
                     <div class="p-8 space-y-3">
                         <div class="flex justify-between items-start">
                             <div>
-                                <h4 class="font-bold text-base text-black">${escapeHTML(entry.client || entry.name || 'Customer')}</h4>
-                                <p class="text-xs font-mono text-neutral-400 mt-0.5">Booking ID: ${bookingIdText} • Service: ${escapeHTML(entry.service || 'Detailing')} • ${formattedDate}</p>
+                                <h4 class="font-bold text-base text-black">${escapeHTML(entry._client)}</h4>
+                                <p class="text-xs font-mono text-neutral-400 mt-0.5">Booking ID: ${bookingIdText} • Service: ${escapeHTML(entry._service)} • ${formattedDate}</p>
                             </div>
                             <div class="bg-neutral-900 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
                                 Rating Score: ${ratingVal} / 5
@@ -1176,8 +1260,27 @@ const defaultServices = [];
         let subscriberFreeBookings = [];
 
         async function loadSubscriberLedgers() {
-            subscriberRosters = [];
-            subscriberFreeBookings = [];
+            // Derive rosters/zero-value ledgers from the mapped invoice collection
+            // (previously these tables were permanently empty stubs).
+            await loadInvoices();
+
+            subscriberRosters = invoicesCollection.filter(inv => inv.type === 'membership').map(inv => ({
+                id: inv.id,
+                client: inv.client,
+                label: 'Monthly Roster Renewal',
+                img: inv.img,
+                date: inv.date,
+                total: inv.total,
+                status: inv.status === 'paid' ? 'paid' : 'pending'
+            }));
+
+            subscriberFreeBookings = invoicesCollection.filter(inv => inv.type === 'subscriber-free').map(inv => ({
+                id: inv.id,
+                client: inv.client,
+                service: inv.service,
+                date: inv.date
+            }));
+
             renderSubscriberRosters();
             renderSubscriberFreeBookings();
         }
@@ -1434,13 +1537,34 @@ const defaultServices = [];
                 const sb = typeof getSupabase === 'function' ? getSupabase() : null;
                 let newBookingId = Math.floor(100000 + Math.random() * 900000);
                 if (sb) {
-                    const { data: bData } = await sb.from('bookings').insert({
+                    // Attach a customer record so the name shows up in booking logs
+                    let customerId = null;
+                    try {
+                        const { data: existingCust } = await sb.from('customers').select('customer_id').eq('phone_number', phone).maybeSingle();
+                        if (existingCust) {
+                            customerId = existingCust.customer_id;
+                        } else {
+                            const { data: newCust } = await sb.from('customers').insert({
+                                full_name: fullName,
+                                phone_number: phone,
+                                customer_type: 'Walk-In'
+                            }).select().single();
+                            if (newCust) customerId = newCust.customer_id;
+                        }
+                    } catch (custErr) {
+                        console.warn("Onsite customer record notice:", custErr);
+                    }
+
+                    const { data: bData, error: bErr } = await sb.from('bookings').insert({
+                        customer_id: customerId,
                         service_id: parseInt(serviceId, 10),
                         scheduled_date: date,
                         time_slot: timeSlot,
+                        purchased_price: parseFloat(document.getElementById('onsiteAmountPaid')?.value || 0) || 0,
                         booking_status: 'Confirmed'
                     }).select().single();
 
+                    if (bErr) throw bErr;
                     if (bData) newBookingId = bData.booking_id;
                 }
 
@@ -1448,14 +1572,15 @@ const defaultServices = [];
                 toggleModal('onsiteBookingModal');
                 loadAppointments();
             } catch (err) {
-                alert('Onsite booking recorded successfully!');
-                toggleModal('onsiteBookingModal');
-                loadAppointments();
+                console.error("Onsite booking failed:", err);
+                alert(`Failed to record onsite booking: ${err.message}`);
             }
         }
 
         window.populateOnsiteServices = populateOnsiteServices;
-        window.handleOnsiteServiceChange = handleOnsiteServiceChange;
+        // NOTE: handleOnsiteServiceChange was exported here previously but never
+        // defined — the ReferenceError aborted this whole export block, breaking
+        // every onclick handler below (submit/feedback/tab switching/logout).
         window.handleOnsiteDateChange = handleOnsiteDateChange;
         window.handleOnsiteBookingSubmission = handleOnsiteBookingSubmission;
 
