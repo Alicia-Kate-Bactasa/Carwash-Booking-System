@@ -141,7 +141,7 @@
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <span><strong class="font-bold uppercase tracking-wider text-red-800">Important Notice:</strong> Online booking requires GCash payment proof. If you wish to pay with Cash, you may visit our studio directly for physical walk-in booking and onsite payment at our counter.</span>
+                  <span><strong class="font-bold uppercase tracking-wider text-red-800">Important Notice:</strong> Online booking requires online payment checkout. If you wish to pay with Cash, you may visit our studio directly for physical walk-in booking and onsite payment at our counter.</span>
                 </div>
               </div>
 
@@ -180,53 +180,6 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input v-model="bookingForm.phone" type="tel" placeholder="Mobile Phone (Required)" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-medium focus:outline-none focus:border-dark focus:bg-white transition-all px-5" />
                   <input v-model="bookingForm.email" type="email" placeholder="Email Address (Required)" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-medium px-5 focus:outline-none focus:border-dark focus:bg-white transition-all" />
-                </div>
-
-                <!-- Payment Details Container -->
-                <div class="pt-4">
-                  <div class="bg-neutral-900 text-light p-6 rounded-[2rem] border border-neutral-800 shadow-xl space-y-4">
-                    <div class="flex justify-between items-center pb-2 border-b border-neutral-800">
-                      <span class="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Select Payment Method</span>
-                    </div>
-
-                    <!-- PayMongo Option (GCash / Maya / Card) -->
-                    <div class="p-3.5 bg-neutral-800/80 border border-neutral-700 rounded-xl flex items-center justify-between">
-                      <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
-                          ₱
-                        </div>
-                        <div>
-                          <div class="text-xs font-bold text-white">PayMongo Payment Gateway</div>
-                          <div class="text-[10px] text-neutral-400">GCash • PayMaya • Credit & Debit Cards</div>
-                        </div>
-                      </div>
-                      <span class="text-[10px] bg-blue-500/20 text-blue-300 font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Instant</span>
-                    </div>
-
-                    <div class="text-xs space-y-1.5 pt-1">
-                      <div class="flex justify-between"><span class="text-neutral-400">Account Name:</span><span class="font-bold text-white">Montage Auto Studio</span></div>
-                      <div class="flex justify-between"><span class="text-neutral-400">Number:</span><span class="font-bold text-white font-mono">09671892659</span></div>
-                    </div>
-                    <div class="pt-1">
-                      <button type="button" @click="showQr = !showQr" class="w-full flex items-center justify-between bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700/80 px-4 py-2.5 rounded-xl text-xs font-semibold text-neutral-200 transition-all select-none">
-                        <span class="flex items-center gap-2">
-                          <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
-                          </svg>
-                          <span>Manual GCash QR Code</span>
-                        </span>
-                        <svg :class="['w-4 h-4 text-neutral-400 transition-transform duration-200', showQr ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                      </button>
-                      <div v-if="showQr" class="mt-2 p-3 bg-neutral-950/45 border border-neutral-800 rounded-xl flex flex-col items-center justify-center transition-all duration-300">
-                        <div class="relative group overflow-hidden rounded-lg bg-neutral-900 p-1 border border-neutral-800">
-                          <img src="/assets/gcashQR.jpg" alt="GCash QR Code" class="w-36 h-36 object-contain rounded-md transition-transform duration-300 group-hover:scale-105" />
-                        </div>
-                        <p class="text-[9px] text-neutral-500 mt-2 uppercase tracking-widest font-bold">Scan with GCash app</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

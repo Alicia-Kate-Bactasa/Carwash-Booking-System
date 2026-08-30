@@ -5,7 +5,7 @@
 
       <div class="text-center mb-6">
         <h3 class="text-xl font-bold uppercase tracking-tight text-dark">VIP Membership Roster</h3>
-        <p class="text-xs text-neutral-400 font-medium mt-1">Instant Activation via PayMongo (₱1,500/mo)</p>
+        <p class="text-xs text-neutral-400 font-medium mt-1">Monthly VIP Access (₱1,500/mo)</p>
       </div>
 
       <form @submit.prevent="handleRegister" class="space-y-4">
@@ -29,14 +29,6 @@
           <input v-model="form.phone" type="tel" required placeholder="e.g. 09171234567" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-dark px-5" />
         </div>
 
-        <div class="p-3.5 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
-          <div>
-            <div class="text-xs font-bold">PayMongo Checkout</div>
-            <div class="text-[10px] text-neutral-400">GCash • PayMaya • Credit & Debit Cards</div>
-          </div>
-          <span class="text-xs font-mono font-bold text-emerald-400">₱1,500/mo</span>
-        </div>
-
         <div v-if="errorMsg" class="text-xs text-red-600 font-semibold text-center">
           {{ errorMsg }}
         </div>
@@ -45,7 +37,7 @@
         </div>
 
         <button type="submit" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-md disabled:opacity-50">
-          {{ loading ? 'Processing PayMongo Checkout...' : 'Pay ₱1,500 & Activate Membership' }}
+          {{ loading ? 'Processing...' : 'Pay ₱1,500 & Join VIP Roster' }}
         </button>
       </form>
     </div>
