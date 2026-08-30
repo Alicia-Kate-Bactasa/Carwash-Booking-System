@@ -3,7 +3,7 @@ const router = express.Router();
 const prisma = require('../config/db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const validate = require('../middleware/validate');
-const { z } = require('zod');
+const { sendInvoiceEmail } = require('../services/mailer');
 
 // Validation schema for submitting payment
 const submitPaymentSchema = z.object({
@@ -335,6 +335,35 @@ router.post('/verify', async (req, res) => {
 
       return { success: true, payment: createdPayment };
     });
+
+    // Send HTML Invoice receipt email asynchronously
+    if (targetInvoiceId) {
+      prisma.invoice.findUnique({
+        where: { invoice_id: targetInvoiceId },
+        include: {
+          booking: { include: { service: true, customer: true } },
+          subscription: { include: { user: true } }
+        }
+      }).then(invDetails => {
+        if (invDetails) {
+          const recipientEmail = invDetails.booking?.customer?.email || invDetails.subscription?.user?.email;
+          const recipientName = invDetails.booking?.customer?.full_name || invDetails.subscription?.user?.username;
+          const serviceName = invDetails.booking?.service?.service_name || invDetails.subscription?.plan_tier || 'Detailing Service';
+
+          if (recipientEmail) {
+            sendInvoiceEmail({
+              to: recipientEmail,
+              clientName: recipientName,
+              invoiceId: invDetails.invoice_id,
+              bookingId: invDetails.booking_id,
+              serviceName: serviceName,
+              amount: invDetails.total_amount,
+              date: invDetails.issued_at
+            }).catch(e => console.error('Invoice Email Error:', e));
+          }
+        }
+      }).catch(e => console.error('Invoice Details Fetch Error:', e));
+    }
 
     return res.status(200).json({
       status: 'success',

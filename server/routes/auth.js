@@ -223,4 +223,150 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 });
 
+const { sendOtpEmail } = require('../services/mailer');
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Generates 6-digit OTP and sends via email for password reset
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const body = getBodyData(req);
+    const email = (body.email || body.emailAddress || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ status: 'error', message: 'Valid email address is required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Return success message to avoid email enumeration attacks
+      return res.status(200).json({
+        status: 'success',
+        message: 'If the email exists, a 6-digit verification code has been sent.'
+      });
+    }
+
+    // Generate 6-digit numeric OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
+
+    // Record security action token in database
+    await prisma.userSecurityAction.create({
+      data: {
+        user_id: user.user_id,
+        action_type: 'password_reset',
+        ip_address: req.ip || '127.0.0.1',
+        identifier: email,
+        token: otpCode,
+        expires_at: expiresAt
+      }
+    });
+
+    // Send email with Nodemailer / Gmail SMTP
+    await sendOtpEmail({ to: email, otp: otpCode, type: 'Password Reset' });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'A 6-digit verification code has been sent to your email.'
+    });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to process password reset request.' });
+  }
+});
+
+/**
+ * POST /api/v1/auth/verify-otp
+ * Verifies 6-digit OTP code validity
+ */
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const body = getBodyData(req);
+    const email = (body.email || '').trim().toLowerCase();
+    const otp = (body.otp || body.token || '').trim();
+
+    if (!email || !otp) {
+      return res.status(400).json({ status: 'error', message: 'Email address and OTP code are required.' });
+    }
+
+    const action = await prisma.userSecurityAction.findFirst({
+      where: {
+        identifier: email,
+        token: otp,
+        action_type: 'password_reset',
+        expires_at: { gte: new Date() }
+      },
+      orderBy: { action_id: 'desc' }
+    });
+
+    if (!action) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired 6-digit verification code.' });
+    }
+
+    return res.status(200).json({ status: 'success', message: 'OTP verification code is valid.' });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to verify code.' });
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Resets user password using verified 6-digit OTP code
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const body = getBodyData(req);
+    const email = (body.email || '').trim().toLowerCase();
+    const otp = (body.otp || body.token || '').trim();
+    const newPassword = body.newPassword || body.password;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ status: 'error', message: 'Email, OTP code, and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ status: 'error', message: 'Password must be at least 6 characters long.' });
+    }
+
+    const action = await prisma.userSecurityAction.findFirst({
+      where: {
+        identifier: email,
+        token: otp,
+        action_type: 'password_reset',
+        expires_at: { gte: new Date() }
+      },
+      orderBy: { action_id: 'desc' }
+    });
+
+    if (!action) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired verification code.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ status: 'error', message: 'User not found.' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { user_id: user.user_id },
+      data: { password: hashedPassword }
+    });
+
+    // Delete used security action
+    await prisma.userSecurityAction.delete({ where: { action_id: action.action_id } }).catch(() => {});
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Password reset successful. You may now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to reset password.' });
+  }
+});
+
 module.exports = router;
