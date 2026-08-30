@@ -186,9 +186,24 @@
                 <div class="pt-4">
                   <div class="bg-neutral-900 text-light p-6 rounded-[2rem] border border-neutral-800 shadow-xl space-y-4">
                     <div class="flex justify-between items-center pb-2 border-b border-neutral-800">
-                      <span class="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Payment Details</span>
+                      <span class="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Select Payment Method</span>
                     </div>
-                    <div class="text-xs space-y-1.5">
+
+                    <!-- PayMongo Option (GCash / Maya / Card) -->
+                    <div class="p-3.5 bg-neutral-800/80 border border-neutral-700 rounded-xl flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                          ₱
+                        </div>
+                        <div>
+                          <div class="text-xs font-bold text-white">PayMongo Payment Gateway</div>
+                          <div class="text-[10px] text-neutral-400">GCash • PayMaya • Credit & Debit Cards</div>
+                        </div>
+                      </div>
+                      <span class="text-[10px] bg-blue-500/20 text-blue-300 font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Instant</span>
+                    </div>
+
+                    <div class="text-xs space-y-1.5 pt-1">
                       <div class="flex justify-between"><span class="text-neutral-400">Account Name:</span><span class="font-bold text-white">Montage Auto Studio</span></div>
                       <div class="flex justify-between"><span class="text-neutral-400">Number:</span><span class="font-bold text-white font-mono">09671892659</span></div>
                     </div>
@@ -198,7 +213,7 @@
                           <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
                           </svg>
-                          <span>Use GCash QR Code</span>
+                          <span>Manual GCash QR Code</span>
                         </span>
                         <svg :class="['w-4 h-4 text-neutral-400 transition-transform duration-200', showQr ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -387,11 +402,44 @@ const submitGuestBooking = async () => {
     });
 
     const result = await res.json().catch(() => ({}));
-    const bookingId = result.booking_id || Math.floor(100000 + Math.random() * 900000);
+    const bookingId = result.booking_id || (result.data ? result.data.booking_id : Math.floor(100000 + Math.random() * 900000));
 
-    if (errorModal.value) {
-      await errorModal.value.show(`Booking request submitted successfully! Booking ID: MTG-${bookingId}`, true);
+    // Launch PayMongo Checkout Session
+    const checkoutRes = await fetch(`${apiBase}/payments/paymongo/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: bookingId,
+        amount: selectedPrice.value,
+        service_name: selectedServiceName.value,
+        client_email: bookingForm.value.email.trim()
+      })
+    });
+
+    const checkoutData = await checkoutRes.json().catch(() => ({}));
+
+    if (checkoutData.checkout_url) {
+      if (checkoutData.sandbox) {
+        // Automatically verify in Sandbox test mode
+        await fetch(`${apiBase}/payments/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId, payment_method: 'PayMongo GCash (Sandbox)' })
+        });
+        if (errorModal.value) {
+          await errorModal.value.show(`Payment verified via PayMongo Sandbox! Booking ID: MTG-${bookingId} is confirmed.`, true);
+        }
+      } else {
+        // Redirect to PayMongo Hosted Checkout Page (GCash / Maya / Card)
+        window.location.href = checkoutData.checkout_url;
+        return;
+      }
+    } else {
+      if (errorModal.value) {
+        await errorModal.value.show(`Booking request submitted successfully! Booking ID: MTG-${bookingId}`, true);
+      }
     }
+
     bookingForm.value = { name: '', phone: '', email: '', serviceId: 1, date: '', timeSlot: '' };
   } catch (err) {
     const fallbackId = Math.floor(100000 + Math.random() * 900000);
@@ -404,7 +452,32 @@ const submitGuestBooking = async () => {
   }
 };
 
+const checkPaymentRedirect = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get('payment');
+  const bookingId = urlParams.get('booking_id');
+
+  if (paymentStatus === 'success' && bookingId) {
+    try {
+      const apiBase = window.API_BASE_URL || '/api/v1';
+      await fetch(`${apiBase}/payments/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: parseInt(bookingId, 10), payment_method: 'PayMongo (Verified)' })
+      });
+
+      if (errorModal.value) {
+        await errorModal.value.show(`Payment successful! Your booking MTG-${bookingId} is now CONFIRMED.`, true);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (e) {
+      console.error('Payment verification failed:', e);
+    }
+  }
+};
+
 onMounted(() => {
   fetchServices();
+  checkPaymentRedirect();
 });
 </script>

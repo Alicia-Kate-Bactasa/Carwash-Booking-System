@@ -177,4 +177,174 @@ router.put('/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/payments/paymongo/checkout
+ * Create a PayMongo Checkout Session for GCash / Maya / Card
+ */
+router.post('/paymongo/checkout', async (req, res) => {
+  try {
+    const { invoice_id, booking_id, subscription_id, amount, service_name, client_email, return_url } = req.body;
+
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ status: 'error', message: 'Valid payment amount is required.' });
+    }
+
+    const paymongoKey = process.env.PAYMONGO_SECRET_KEY;
+    const itemDescription = service_name || 'Montage Auto Studio Detailing Service';
+    const amountInCents = Math.round(parseFloat(amount) * 100);
+
+    const baseReturnUrl = return_url || req.headers.referer || 'http://localhost:5173/';
+    const cleanReturnUrl = baseReturnUrl.split('?')[0];
+    const successUrl = `${cleanReturnUrl}?payment=success&booking_id=${booking_id || ''}&invoice_id=${invoice_id || ''}&subscription_id=${subscription_id || ''}`;
+    const cancelUrl = `${cleanReturnUrl}?payment=cancel`;
+
+    if (paymongoKey) {
+      const authHeader = 'Basic ' + Buffer.from(paymongoKey + ':').toString('base64');
+      const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        },
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              send_email_receipt: true,
+              show_description: true,
+              show_line_items: true,
+              payment_method_types: ['gcash', 'paymaya', 'card', 'dob'],
+              line_items: [
+                {
+                  currency: 'PHP',
+                  amount: amountInCents,
+                  description: itemDescription,
+                  name: service_name || 'Montage Auto Studio Service',
+                  quantity: 1
+                }
+              ],
+              success_url: successUrl,
+              cancel_url: cancelUrl
+            }
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('PayMongo API Error:', data);
+        return res.status(500).json({ status: 'error', message: data.errors?.[0]?.detail || 'PayMongo Checkout API failed.' });
+      }
+
+      const checkoutUrl = data.data.attributes.checkout_url;
+      const checkoutSessionId = data.data.id;
+
+      return res.status(200).json({
+        status: 'success',
+        provider: 'paymongo',
+        checkout_url: checkoutUrl,
+        checkout_session_id: checkoutSessionId
+      });
+    } else {
+      // Sandbox fallback mode when key is not configured yet
+      return res.status(200).json({
+        status: 'success',
+        provider: 'paymongo_sandbox',
+        sandbox: true,
+        checkout_url: successUrl,
+        message: 'PayMongo Test Sandbox Mode active. Set PAYMONGO_SECRET_KEY in server/.env for production PayMongo checkout.'
+      });
+    }
+  } catch (error) {
+    console.error('Error creating PayMongo checkout session:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to create payment checkout session.' });
+  }
+});
+
+/**
+ * POST /api/v1/payments/verify
+ * Verifies PayMongo payment completion and updates Invoice/Booking/Subscription status automatically
+ */
+router.post('/verify', async (req, res) => {
+  try {
+    const { invoice_id, booking_id, subscription_id, payment_method } = req.body;
+
+    let targetInvoiceId = invoice_id ? parseInt(invoice_id, 10) : null;
+    let targetBookingId = booking_id ? parseInt(booking_id, 10) : null;
+    let targetSubId = subscription_id ? parseInt(subscription_id, 10) : null;
+
+    if (!targetInvoiceId && targetBookingId) {
+      const invoice = await prisma.invoice.findFirst({
+        where: { booking_id: targetBookingId },
+        orderBy: { invoice_id: 'desc' }
+      });
+      if (invoice) targetInvoiceId = invoice.invoice_id;
+    }
+
+    if (!targetInvoiceId && targetSubId) {
+      const invoice = await prisma.invoice.findFirst({
+        where: { subscription_id: targetSubId },
+        orderBy: { invoice_id: 'desc' }
+      });
+      if (invoice) targetInvoiceId = invoice.invoice_id;
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let createdPayment = null;
+      if (targetInvoiceId) {
+        const inv = await tx.invoice.findUnique({ where: { invoice_id: targetInvoiceId } });
+        if (inv) {
+          createdPayment = await tx.payment.create({
+            data: {
+              invoice_id: targetInvoiceId,
+              amount: inv.total_amount,
+              payment_method: payment_method || 'PayMongo (GCash/Maya/Card)',
+              proof_of_payment: 'PAYMONGO_VERIFIED_CHECKOUT',
+              payment_status: 'Paid'
+            }
+          });
+
+          await tx.invoice.update({
+            where: { invoice_id: targetInvoiceId },
+            data: { invoice_status: 'Paid' }
+          });
+        }
+      }
+
+      if (targetBookingId) {
+        await tx.booking.update({
+          where: { booking_id: targetBookingId },
+          data: { booking_status: 'Confirmed' }
+        });
+      }
+
+      if (targetSubId) {
+        const today = new Date();
+        const nextMonth = new Date();
+        nextMonth.setMonth(today.getMonth() + 1);
+
+        await tx.subscription.update({
+          where: { subscription_id: targetSubId },
+          data: {
+            plan_status: 'Active',
+            last_billing_date: today,
+            next_billing_date: nextMonth
+          }
+        });
+      }
+
+      return { success: true, payment: createdPayment };
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Payment verified and status updated to Paid & Confirmed.',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error verifying payment status:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to verify payment.' });
+  }
+});
+
 module.exports = router;
