@@ -13,7 +13,8 @@ const feedbackRouter = require('./routes/feedback');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Core Middleware
+// Security & Core Middleware
+app.disable('x-powered-by');
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
