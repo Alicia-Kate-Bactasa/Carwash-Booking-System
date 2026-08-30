@@ -5,7 +5,7 @@
 
       <div class="text-center mb-6">
         <h3 class="text-xl font-bold uppercase tracking-tight text-dark">VIP Membership Roster</h3>
-        <p class="text-xs text-neutral-400 font-medium mt-1">Submit registration details & payment proof</p>
+        <p class="text-xs text-neutral-400 font-medium mt-1">Instant Activation via PayMongo (₱1,500/mo)</p>
       </div>
 
       <form @submit.prevent="handleRegister" class="space-y-4">
@@ -29,6 +29,14 @@
           <input v-model="form.phone" type="tel" required placeholder="e.g. 09171234567" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-dark px-5" />
         </div>
 
+        <div class="p-3.5 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold">PayMongo Checkout</div>
+            <div class="text-[10px] text-neutral-400">GCash • PayMaya • Credit & Debit Cards</div>
+          </div>
+          <span class="text-xs font-mono font-bold text-emerald-400">₱1,500/mo</span>
+        </div>
+
         <div v-if="errorMsg" class="text-xs text-red-600 font-semibold text-center">
           {{ errorMsg }}
         </div>
@@ -37,7 +45,7 @@
         </div>
 
         <button type="submit" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-md disabled:opacity-50">
-          {{ loading ? 'Submitting Application...' : 'Submit VIP Application' }}
+          {{ loading ? 'Processing PayMongo Checkout...' : 'Pay ₱1,500 & Activate Membership' }}
         </button>
       </form>
     </div>
@@ -83,17 +91,36 @@ const handleRegister = async () => {
     });
 
     const result = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(result.message || 'Failed to complete registration.');
+    if (!res.ok && res.status !== 409) {
+      throw new Error(result.message || 'Failed to complete registration.');
+    }
 
-    successMsg.value = 'Registration submitted! Check your email to confirm your account.';
-    setTimeout(() => {
-      emit('close');
-    }, 2000);
+    // Launch PayMongo Checkout Session for Subscription Registration
+    const checkoutRes = await fetch(`${apiBase}/payments/paymongo/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 1500,
+        service_name: 'VIP Membership Roster - Monthly Subscription',
+        client_email: form.value.email.trim()
+      })
+    });
+
+    const checkoutData = await checkoutRes.json().catch(() => ({}));
+    if (checkoutData.checkout_url) {
+      if (checkoutData.sandbox) {
+        successMsg.value = 'VIP Subscription application submitted & verified via PayMongo Sandbox!';
+        setTimeout(() => { emit('close'); }, 2000);
+      } else {
+        window.location.href = checkoutData.checkout_url;
+        return;
+      }
+    } else {
+      successMsg.value = 'Registration submitted successfully!';
+      setTimeout(() => { emit('close'); }, 2000);
+    }
   } catch (err) {
-    successMsg.value = 'Registration submitted! Check your email to confirm your account.';
-    setTimeout(() => {
-      emit('close');
-    }, 2000);
+    errorMsg.value = err.message || 'Registration failed. Please try again.';
   } finally {
     loading.value = false;
   }

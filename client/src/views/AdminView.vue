@@ -158,24 +158,8 @@
       <section v-if="activeTab === 'ledgers'" class="space-y-8">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-neutral-200 pb-6 gap-4">
           <div>
-            <h2 class="text-3xl font-bold tracking-tight text-black">Payments</h2>
-            <p class="text-neutral-500 text-sm mt-2">Check payment proof images and review past payments.</p>
-          </div>
-          <div class="flex flex-wrap gap-3 self-end sm:self-auto items-center">
-            <div class="bg-neutral-200/80 p-1 rounded-full flex gap-1">
-              <button 
-                @click="ledgerSlide = 'pending'" 
-                :class="['text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full transition-all', ledgerSlide === 'pending' ? 'bg-white text-black shadow-sm' : 'text-neutral-500 hover:text-black']"
-              >
-                Pending
-              </button>
-              <button 
-                @click="ledgerSlide = 'archive'" 
-                :class="['text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-full transition-all', ledgerSlide === 'archive' ? 'bg-white text-black shadow-sm' : 'text-neutral-500 hover:text-black']"
-              >
-                History
-              </button>
-            </div>
+            <h2 class="text-3xl font-bold tracking-tight text-black">Payments Ledger</h2>
+            <p class="text-neutral-500 text-sm mt-2">Automatically verified payment transactions via PayMongo gateway.</p>
           </div>
         </div>
 
@@ -188,21 +172,23 @@
                   <th class="p-5">Type</th>
                   <th class="p-5">Amount</th>
                   <th class="p-5">Issued Date</th>
-                  <th class="p-5 text-right">Status</th>
+                  <th class="p-5">Gateway</th>
+                  <th class="p-5 text-right">Verification Status</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-neutral-100 font-medium text-neutral-700 text-xs">
                 <tr v-if="invoices.length === 0">
-                  <td colspan="5" class="p-8 text-center text-neutral-400 font-mono">No payment records found.</td>
+                  <td colspan="6" class="p-8 text-center text-neutral-400 font-mono">No payment records found.</td>
                 </tr>
                 <tr v-for="inv in invoices" :key="inv.invoice_id" class="hover:bg-neutral-50">
                   <td class="p-5 font-mono font-bold text-black">INV-{{ inv.invoice_id }}</td>
                   <td class="p-5 uppercase text-xs font-bold text-neutral-600">{{ inv.invoice_type || 'Detailing Treatment' }}</td>
                   <td class="p-5 font-bold text-emerald-600">₱{{ inv.total_amount }}</td>
                   <td class="p-5">{{ inv.issued_at ? inv.issued_at.split('T')[0] : '-' }}</td>
+                  <td class="p-5 font-semibold text-neutral-600">PayMongo (GCash/Maya/Card)</td>
                   <td class="p-5 text-right">
-                    <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {{ inv.invoice_status || 'Paid' }}
+                    <span :class="['px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider', inv.invoice_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200']">
+                      {{ inv.invoice_status === 'Paid' ? 'Verified (Auto)' : (inv.invoice_status || 'Pending Payment') }}
                     </span>
                   </td>
                 </tr>

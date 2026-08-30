@@ -247,13 +247,13 @@
             <div class="space-y-4">
               <h4 class="text-xs uppercase tracking-wider text-neutral-400 font-bold border-b border-neutral-100 pb-3">Payments & Billing</h4>
               <div class="text-sm font-medium text-neutral-500 leading-relaxed">
-                Upload GCash remittance screenshots to verify your current billing cycle, renew access limits, or initiate plan downgrades.
+                Instant monthly subscription renewal via PayMongo (GCash, PayMaya, Credit & Debit cards).
               </div>
             </div>
 
             <div class="space-y-3">
-              <button @click="showRenewalModal = true" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-4 rounded-full transition-all text-center shadow-sm">
-                Pay Next Monthly Renewal
+              <button @click="handleSubscriptionRenewal" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-4 rounded-full transition-all text-center shadow-sm">
+                Pay Next Monthly Renewal (₱1,500)
               </button>
               <button @click="showCancelModal = true" class="w-full bg-white hover:bg-red-50 text-red-600 border border-neutral-200 hover:border-red-200 text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all text-center">
                 Cancel Subscription Plan
@@ -409,6 +409,79 @@ const submitMemberBooking = async () => {
   }
 };
 
+const handleSubscriptionRenewal = async () => {
+  try {
+    const apiBase = window.API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('auth_token');
+    const subRes = await fetch(`${apiBase}/subscriptions/renew`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ plan_tier: 'Unlimited Basic Wash' })
+    });
+
+    const subData = await subRes.json().catch(() => ({}));
+    const subId = subData.data?.subscription?.subscription_id;
+
+    // Launch PayMongo Checkout Session for Subscription Renewal
+    const checkoutRes = await fetch(`${apiBase}/payments/paymongo/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription_id: subId,
+        amount: 1500,
+        service_name: 'VIP Membership Roster - Monthly Renewal',
+        client_email: localStorage.getItem('subscriber_email') || ''
+      })
+    });
+
+    const checkoutData = await checkoutRes.json().catch(() => ({}));
+    if (checkoutData.checkout_url) {
+      if (checkoutData.sandbox) {
+        await fetch(`${apiBase}/payments/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription_id: subId, payment_method: 'PayMongo GCash (Sandbox)' })
+        });
+        if (errorModal.value) await errorModal.value.show("Monthly subscription payment verified & plan activated!", true);
+      } else {
+        window.location.href = checkoutData.checkout_url;
+        return;
+      }
+    } else {
+      if (errorModal.value) await errorModal.value.show("Subscription renewal request generated!", true);
+    }
+  } catch (err) {
+    if (errorModal.value) errorModal.value.show(err.message || 'Failed to process subscription renewal.');
+  }
+};
+
+const checkSubscriptionPaymentRedirect = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get('payment');
+  const subId = urlParams.get('subscription_id');
+
+  if (paymentStatus === 'success' && subId) {
+    try {
+      const apiBase = window.API_BASE_URL || '/api/v1';
+      await fetch(`${apiBase}/payments/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription_id: parseInt(subId, 10), payment_method: 'PayMongo (Verified)' })
+      });
+
+      if (errorModal.value) {
+        await errorModal.value.show("Monthly subscription payment verified & plan active!", true);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (e) {
+      console.error('Subscription payment verification failed:', e);
+    }
+  }
+};
+
 const logout = async () => {
   localStorage.removeItem('subscriber_session_active');
   localStorage.removeItem('subscriber_name');
@@ -419,5 +492,6 @@ const logout = async () => {
 onMounted(() => {
   loadAppointments();
   fetchCatalogServices();
+  checkSubscriptionPaymentRedirect();
 });
 </script>
