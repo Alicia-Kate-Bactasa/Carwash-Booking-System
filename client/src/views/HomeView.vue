@@ -344,9 +344,10 @@ const fetchServices = async () => {
     const apiBase = window.API_BASE_URL || '/api/v1';
     const res = await fetch(`${apiBase}/services`);
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        services.value = data.map(s => ({
+      const result = await res.json();
+      const items = Array.isArray(result) ? result : (result.data || []);
+      if (items.length > 0) {
+        services.value = items.map(s => ({
           service_id: s.service_id,
           name: s.service_name,
           price: parseFloat(s.service_price),

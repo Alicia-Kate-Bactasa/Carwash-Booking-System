@@ -356,10 +356,9 @@ const fetchCatalogServices = async () => {
     const apiBase = window.API_BASE_URL || '/api/v1';
     const res = await fetch(`${apiBase}/services`);
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        catalogServices.value = data;
-      }
+      const result = await res.json();
+      const items = Array.isArray(result) ? result : (result.data || []);
+      catalogServices.value = items;
     }
   } catch (err) {
     console.warn("Catalog fetch notice:", err);
