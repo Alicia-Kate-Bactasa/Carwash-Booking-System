@@ -1,8 +1,10 @@
-const supabaseAdmin = require('../config/supabaseAdmin');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
 
 /**
  * Authentication Middleware
- * Verifies the Supabase JWT token passed in the Authorization header: Bearer <token>
+ * Verifies JWT token passed in Authorization header: Bearer <token>
  */
 const requireAuth = async (req, res, next) => {
   try {
@@ -10,34 +12,26 @@ const requireAuth = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         status: 'error',
-        message: 'Authorization header missing or invalid. Format: Bearer <token>'
+        message: 'Authorization token missing or invalid. Format: Bearer <token>'
       });
     }
 
     const token = authHeader.split(' ')[1];
 
-    if (!supabaseAdmin) {
-      // Development fallback if Supabase environment variables aren't initialized yet
-      req.user = { id: 'dev-user-id', email: 'dev@montage.com', role: 'Admin' };
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email,
+        role: decoded.role || 'Customer'
+      };
       return next();
-    }
-
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !user) {
+    } catch (err) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid or expired authentication token.'
       });
     }
-
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.user_metadata?.role || user.role || 'Customer'
-    };
-
-    next();
   } catch (err) {
     console.error('Auth Middleware Error:', err);
     return res.status(500).json({

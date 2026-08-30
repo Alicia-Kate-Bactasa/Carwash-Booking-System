@@ -1,11 +1,36 @@
-# === Some of my notes hehe ===
-email_templates.md
-# === Operating System Files ===
+# === Environment & Secrets ===
+.env
+.env.*
+!.env.example
+server/.env
+client/.env
+server/.env.local
+client/config.local.js
+
+# === Dependencies ===
+node_modules/
+**/node_modules/
+
+# === Build Outputs ===
+dist/
+**/dist/
+build/
+client/dist/
+
+# === Database & Logs ===
+*.log
+*.sql
+database/*.sql
+backup/
+*.sqlite
+*.sqlite-journal
+
+# === OS & System Files ===
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# === IDE and Editor Settings ===
+# === IDE & Editor Settings ===
 .vscode/
 .idea/
 *.suo
@@ -13,32 +38,4 @@ desktop.ini
 *.njsproj
 *.sln
 *.swp
-
-# === Database Backups & Local Dumps ===
-*.sql
-**/*.sql
-database/*.sql
-backup/
-*.log
-
-# === User Uploaded Assets ===
-uploads/*
-!uploads/.gitkeep
-
-# === Node & Backend Server Dependencies ===
-node_modules/
-server/node_modules/
-.env
-.env.local
-server/.env
-
-# === Frontend Configuration Secrets ===
-config.js
-client/config.js
-config.local.js
-client/config.local.js
-
-# Ignore any local text logs or OS system files
-*.log
-.DS_Store
-Thumbs.db
+*.swo

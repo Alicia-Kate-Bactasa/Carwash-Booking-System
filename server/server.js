@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const authRouter = require('./routes/auth');
 const servicesRouter = require('./routes/services');
 const bookingsRouter = require('./routes/bookings');
 const paymentsRouter = require('./routes/payments');
@@ -10,7 +11,7 @@ const adminRouter = require('./routes/admin');
 const feedbackRouter = require('./routes/feedback');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Core Middleware
 app.use(cors());
@@ -27,6 +28,8 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/v1/auth', authRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/v1/services', servicesRouter);
 app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
