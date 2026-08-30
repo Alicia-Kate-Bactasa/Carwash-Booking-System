@@ -322,19 +322,21 @@ const loadBookings = async () => {
       if (Array.isArray(data)) {
         appointments.value = data.map(app => {
           let type = 'cancelled';
-          if (['Pending Verification', 'Confirmed', 'Pending', 'Paid', 'Scheduled'].includes(app.booking_status)) {
+          const statusStr = String(app.booking_status || '');
+          if (['Pending Verification', 'Pending_Verification', 'Confirmed', 'Pending', 'Paid', 'Scheduled'].includes(statusStr)) {
             type = 'pending';
-          } else if (app.booking_status === 'Completed') {
+          } else if (statusStr === 'Completed') {
             type = 'completed';
           }
+
           return {
             id: "MTG-" + app.booking_id,
             booking_id: parseInt(app.booking_id, 10),
             type,
-            service: app.service_name || app.services?.service_name || 'Car Wash',
-            date: app.scheduled_date,
-            time: app.time_slot,
-            client: app.customer_name || app.customers?.full_name || 'Client',
+            service: app.service?.service_name || app.services?.service_name || app.service_name || 'Car Wash',
+            date: app.scheduled_date ? String(app.scheduled_date).split('T')[0] : '—',
+            time: app.time_slot || '—',
+            client: app.customer?.full_name || app.customers?.full_name || app.customer_name || 'Client',
             userType: app.user_id ? 'subscriber' : 'regular'
           };
         });

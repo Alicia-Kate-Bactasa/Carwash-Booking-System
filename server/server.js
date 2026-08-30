@@ -36,6 +36,7 @@ app.use('/api/v1/payments', paymentsRouter);
 app.use('/api/v1/subscriptions', subscriptionsRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/feedback', feedbackRouter);
+app.use('/api/v1/feedbacks', feedbackRouter);
 
 // 404 Handler
 app.use((req, res) => {

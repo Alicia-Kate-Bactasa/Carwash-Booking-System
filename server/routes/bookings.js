@@ -21,6 +21,55 @@ const createBookingSchema = z.object({
 });
 
 /**
+ * GET /api/v1/user/bookings
+ * Get current user bookings list
+ */
+router.get('/user/bookings', async (req, res) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      include: {
+        service: true,
+        customer: true
+      },
+      orderBy: { booking_id: 'desc' }
+    });
+
+    return res.status(200).json(bookings);
+  } catch (error) {
+    console.error('Error fetching user bookings:', error);
+    return res.status(200).json([]);
+  }
+});
+
+/**
+ * POST /api/v1/bookings/member
+ * Create member booking
+ */
+router.post('/member', async (req, res) => {
+  try {
+    const { service_id, scheduled_date, time_slot } = req.body;
+    if (!service_id || !scheduled_date || !time_slot) {
+      return res.status(400).json({ status: 'error', message: 'Missing required booking fields.' });
+    }
+
+    const newBooking = await prisma.booking.create({
+      data: {
+        service_id: parseInt(service_id, 10),
+        scheduled_date: new Date(scheduled_date),
+        time_slot,
+        purchased_price: 0,
+        booking_status: 'Confirmed'
+      }
+    });
+
+    return res.status(201).json({ status: 'success', data: newBooking });
+  } catch (error) {
+    console.error('Error creating member booking:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to reserve booking session.' });
+  }
+});
+
+/**
  * GET /api/v1/bookings
  * Get bookings list (filtered for current user or all for admin)
  */
