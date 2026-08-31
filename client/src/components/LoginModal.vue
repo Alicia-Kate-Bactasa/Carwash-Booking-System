@@ -170,7 +170,11 @@ const handleLogin = async () => {
     localStorage.setItem('subscriber_name', result.user?.full_name || loginForm.value.email.split('@')[0]);
     if (result.token) localStorage.setItem('auth_token', result.token);
     emit('close');
-    router.push('/dashboard');
+    if (result.user?.role === 'Admin' || loginForm.value.email.toLowerCase().includes('admin')) {
+      router.push('/admin');
+    } else {
+      router.push('/dashboard');
+    }
   } catch (err) {
     errorMsg.value = err.message || 'Invalid email address or password.';
   } finally {

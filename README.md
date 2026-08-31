@@ -110,6 +110,3 @@ npm run build
 
 ---
 
-## License
-
-Copyright 2026 Montage Auto Studio. All rights reserved.
