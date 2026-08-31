@@ -64,27 +64,6 @@ montageAutoStudio/
 
 ---
 
-## Database Architecture
-
-The application uses Prisma ORM connected to Neon PostgreSQL:
-
-- **User**: Mapped table users supporting Subscriber and Admin user profiles with bcrypt password hashing.
-- **Service**: Mapped table services storing detailing packages (service_name, service_price, service_duration, service_description, is_active).
-- **Booking**: Mapped table bookings tracking appointment sessions, time slots, bay assignments, and status (Pending_Verification, Confirmed, Completed, Cancelled).
-- **Invoice**: Mapped table invoices generating single detailing or monthly membership subscription invoices.
-- **Subscription**: Mapped table subscriptions tracking VIP membership plan status (Active, Cancelled), last billing date, and next billing date.
-- **Feedback**: Mapped table feedbacks capturing ratings (1-5 stars) and customer reviews verified against completed booking IDs.
-
----
-
-## Security and Environment Configuration
-
-- **Environment Isolation**: Sensitive keys such as DATABASE_URL, JWT_SECRET, PAYMONGO_SECRET_KEY, and RESEND_API_KEY are defined inside server/.env.
-- **Git Ignore Safeguards**: .env, environment overrides (*.env), user file uploads, log files (*.log), and build artifacts (dist/, node_modules/) are strictly excluded via .gitignore.
-- **Schema Safety**: server/prisma/schema.prisma contains structural table definitions only and references dynamic environment variables without hardcoded credentials.
-
----
-
 ## Getting Started
 
 ### 1. Backend Setup
