@@ -1,3 +1,9 @@
+/**
+ * VIP Subscriptions API Router for Montage Auto Studio.
+ * Handles VIP membership roster monitoring, member status checks (/me),
+ * subscription plan renewals, cancellations, reactivations, and admin status updates.
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
@@ -5,9 +11,10 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 /**
  * GET /api/v1/subscriptions
- * Get all subscribers (Admin)
+ * Retrieves all subscriber accounts for admin monitoring.
  */
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
+
   try {
     const { status } = req.query;
     const where = {};

@@ -1,13 +1,20 @@
+/**
+ * Authentication & Authorization Middleware module for Montage Auto Studio.
+ * Verifies JSON Web Tokens (JWT) for protected client routes and enforces role-based access control (Admin).
+ */
+
 const jwt = require('jsonwebtoken');
 
+// JWT secret key resolution and production security audit check
 const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
   console.error('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
 }
 
 /**
- * Authentication Middleware
- * Verifies JWT token passed in Authorization header: Bearer <token>
+ * Authentication Middleware:
+ * Inspects incoming request headers for a Bearer JWT token.
+ * Decodes user details (id, email, role) and attaches them to req.user upon successful verification.
  */
 const requireAuth = async (req, res, next) => {
   try {
@@ -45,7 +52,8 @@ const requireAuth = async (req, res, next) => {
 };
 
 /**
- * Require Admin Role Middleware
+ * Role-Based Access Control Middleware:
+ * Ensures the authenticated user possesses administrative privileges (Admin role).
  */
 const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'Admin') {
@@ -61,3 +69,4 @@ module.exports = {
   requireAuth,
   requireAdmin
 };
+

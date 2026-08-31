@@ -1,3 +1,9 @@
+// ============================================================================
+// Prisma Database Schema Definition for Montage Auto Studio
+// Configures PostgreSQL datasource connection, JavaScript client generator,
+// custom ENUM mapped types, and database relational models.
+// ============================================================================
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,7 +13,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ----------------------------------------------------------------------------
+// ENUM DEFINITIONS (Mapped to PostgreSQL Enum Types)
+// ----------------------------------------------------------------------------
+
 enum BookingStatus {
+
   Pending
   Pending_Verification @map("Pending Verification")
   Confirmed

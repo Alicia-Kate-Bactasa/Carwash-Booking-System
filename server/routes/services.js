@@ -1,12 +1,19 @@
+/**
+ * Service Catalog Management API Router for Montage Auto Studio.
+ * Handles fetching available detailing packages, package updates, new package creations,
+ * soft deactivations, and activation status toggling by administrators.
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
 
 /**
  * GET /api/v1/services
- * Get list of available services (Optionally include inactive services with ?include_inactive=true)
+ * Retrieves available service packages catalog (Optionally includes inactive services with ?include_inactive=true).
  */
 router.get('/', async (req, res) => {
+
   try {
     const { include_inactive } = req.query;
     const whereCondition = include_inactive === 'true' ? {} : { is_active: true };

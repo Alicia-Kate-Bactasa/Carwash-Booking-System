@@ -1,5 +1,12 @@
 /**
- * Middleware factory to validate request body, query, or params against a Zod schema
+ * Request Payload Validation Middleware for Montage Auto Studio.
+ * Uses Zod schemas to validate incoming request body, query parameters, and URL parameters before route handlers process them.
+ */
+
+/**
+ * Higher-order middleware factory function.
+ * Accepts a Zod schema, validates req.body, req.query, and req.params,
+ * and attaches normalized validated data to req.validated.
  */
 const validate = (schema) => (req, res, next) => {
   try {
@@ -29,3 +36,4 @@ const validate = (schema) => (req, res, next) => {
 };
 
 module.exports = validate;
+

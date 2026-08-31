@@ -1,7 +1,14 @@
+/**
+ * Email Notification & HTML Receipt Service for Montage Auto Studio.
+ * Handles Nodemailer SMTP setup, responsive HTML templates, fallback mail simulation logging,
+ * and automated email notifications (invoices, OTP codes, booking confirmations, cancellations, subscriptions).
+ */
+
 const nodemailer = require('nodemailer');
 
 /**
- * Configure SMTP Transporter (Gmail / Custom SMTP)
+ * Creates and returns Nodemailer SMTP Transporter using environment credentials.
+ * Defaults to Gmail SMTP port 465 (secure SSL).
  */
 const getTransporter = () => {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -21,9 +28,11 @@ const getTransporter = () => {
 };
 
 /**
- * Common SendMail helper with fallback logging
+ * Helper function to send email via SMTP transporter.
+ * If SMTP credentials are not present, logs a simulated email output to the server console.
  */
 const sendMailHelper = async ({ to, subject, htmlContent, tag }) => {
+
   const from = process.env.SMTP_FROM || `"Montage Auto Studio" <${process.env.SMTP_USER || 'bactasa.kate.2006@gmail.com'}>`;
   const transporter = getTransporter();
 

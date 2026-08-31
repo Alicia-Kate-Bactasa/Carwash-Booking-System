@@ -1,3 +1,8 @@
+/**
+ * Customer Feedback API Router for Montage Auto Studio.
+ * Handles feedback submission, booking verification for review eligibility, and retrieval of customer ratings.
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
@@ -5,6 +10,7 @@ const { requireAuth } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { z } = require('zod');
 
+// Zod validation schema for feedback submission payload
 const feedbackSchema = z.object({
   body: z.object({
     booking_id: z.number().int().positive('booking_id is required'),
@@ -12,6 +18,7 @@ const feedbackSchema = z.object({
     comments: z.string().optional()
   })
 });
+
 
 /**
  * GET /api/v1/feedback
@@ -69,7 +76,7 @@ router.get('/verify-booking/:bookingId', async (req, res) => {
     if (booking.booking_status !== 'Completed') {
       return res.status(400).json({
         status: 'error',
-        message: `Booking #MTG-${bookingId} is currently '${booking.booking_status}'. Feedback can only be submitted once the service is Completed.`
+        message: `Feedback can only be submitted once the service is Completed.`
       });
     }
 

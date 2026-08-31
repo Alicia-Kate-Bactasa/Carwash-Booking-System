@@ -1,12 +1,19 @@
+/**
+ * Admin Management API Router for Montage Auto Studio.
+ * Provides endpoints for administrative booking management, invoice history retrieval,
+ * subscription roster monitoring, walk-in counter booking creation, and dashboard statistics.
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
 
 /**
  * GET /api/v1/admin/bookings
- * Returns all customer bookings for admin management
+ * Retrieves all customer bookings with associated service, customer, and user data.
  */
 router.get('/bookings', async (req, res) => {
+
   try {
     const bookings = await prisma.booking.findMany({
       include: {

@@ -1,3 +1,9 @@
+/**
+ * Payments & Checkout API Router for Montage Auto Studio.
+ * Handles PayMongo Hosted Checkout integration (GCash, Maya, Card), payment status verification,
+ * manual payment proof submissions, and admin payment approval/rejection workflows.
+ */
+
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
@@ -7,9 +13,10 @@ const validate = require('../middleware/validate');
 const { sendInvoiceEmail } = require('../services/mailer');
 const { z } = require('zod');
 
+// Environment JWT secret configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
 
-// Validation schema for submitting payment
+// Zod validation schema for manual payment submission
 const submitPaymentSchema = z.object({
   body: z.object({
     invoice_id: z.number().int().positive('Valid invoice_id is required'),
@@ -18,6 +25,7 @@ const submitPaymentSchema = z.object({
     proof_of_payment: z.string().min(5, 'Proof of payment image URL/reference is required')
   })
 });
+
 
 /**
  * GET /api/v1/payments/invoices

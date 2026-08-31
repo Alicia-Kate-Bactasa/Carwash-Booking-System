@@ -1,3 +1,9 @@
+/**
+ * Authentication & Security API Router for Montage Auto Studio.
+ * Handles user login, registration pre-checkout with PayMongo, profile retrieval (/me),
+ * and 6-digit OTP verification password reset functionality.
+ */
+
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -5,12 +11,17 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 
+// Environment secret configuration check
 const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
   console.error('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
 }
 
+/**
+ * Safely parses request body data supporting both object and JSON string formats.
+ */
 const getBodyData = (req) => {
+
   let body = req.body;
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch(e){}

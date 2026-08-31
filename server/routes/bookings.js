@@ -1,3 +1,9 @@
+/**
+ * Booking Management API Router for Montage Auto Studio.
+ * Handles appointment slot checking, regular guest bookings, ₱0.00 VIP member bookings,
+ * booking rescheduling, status updates, and booking cancellations.
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
@@ -5,7 +11,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { z } = require('zod');
 
-// Zod schema for booking creation
+// Zod validation schema for booking creation payload
 const createBookingSchema = z.object({
   body: z.object({
     service_id: z.number().int().positive('Valid service_id is required'),
@@ -19,6 +25,7 @@ const createBookingSchema = z.object({
     user_id: z.number().int().optional()
   })
 });
+
 
 /**
  * GET /api/v1/user/bookings
