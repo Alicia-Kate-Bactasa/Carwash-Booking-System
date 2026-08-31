@@ -1,3 +1,8 @@
+<!--
+  Public Home Landing View Component for Montage Auto Studio.
+  Renders hero section, studio facility highlights, detailing services catalog, VIP subscription plan promo,
+  and guest booking reservation portal with PayMongo checkout integration.
+-->
 <template>
   <div class="bg-light text-dark font-sans antialiased selection:bg-dark selection:text-light">
     <!-- LANDING PAGE HEADER -->
@@ -11,7 +16,7 @@
           <button @click="showFeedbackModal = true" class="hover:text-dark transition-colors uppercase focus:outline-none">Feedback</button>
         </nav>
         <div class="flex items-center space-x-3">
-          <button @click="showLoginModal = true" class="text-xs font-bold tracking-wider uppercase border border-neutral-300 px-5 py-2.5 rounded-full hover:border-dark hover:bg-dark hover:text-light transition-all">
+          <button @click="openLoginModal(false)" class="text-xs font-bold tracking-wider uppercase border border-neutral-300 px-5 py-2.5 rounded-full hover:border-dark hover:bg-dark hover:text-light transition-all">
             Login / Register
           </button>
           <a href="#booking-wizard" class="text-xs font-bold tracking-wider uppercase bg-dark text-light px-5 py-2.5 rounded-full border border-dark hover:bg-neutral-800 transition-all">
@@ -128,8 +133,8 @@
               <li class="flex items-center">✓ Benefit from an all exclusive rescheduling feature!</li>
               <li class="flex items-center">✓ Be able to view your past appointments!</li>
             </ul>
-            <button @click="showRegisterModal = true" class="bg-light text-dark font-bold text-xs tracking-widest uppercase px-6 py-3.5 rounded-full hover:bg-neutral-200 transition-all shadow-sm">
-              Get Subscription
+            <button @click="openLoginModal(true)" class="bg-light text-dark font-bold text-xs tracking-widest uppercase px-6 py-3.5 rounded-full hover:bg-neutral-200 transition-all shadow-sm">
+              Register Now
             </button>
           </div>
         </div>
@@ -283,7 +288,7 @@
         </div>
         <div>
           <div class="text-[11px] font-bold tracking-widest uppercase text-neutral-500 mb-4">Operating Hours</div>
-          <p class="text-neutral-400">Mon–Fri: 9:00 AM – 6:00 PM<br>Sat: 8:00 AM – 4:00 PM</p>
+          <p class="text-neutral-400">Mon–Sat: 9:00 AM – 5:00 PM</p>
         </div>
         <div>
           <div class="text-[11px] font-bold tracking-widest uppercase text-neutral-500 mb-4">Studio Coordinates</div>
@@ -298,10 +303,7 @@
     <!-- Vue Modals with fade transitions -->
     <GlobalErrorModal ref="errorModal" />
     <transition name="fade-scale">
-      <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />
-    </transition>
-    <transition name="fade-scale">
-      <RegisterSubModal v-if="showRegisterModal" @close="showRegisterModal = false" />
+      <LoginModal v-if="showLoginModal" :initial-register="loginModalInitialRegister" @close="showLoginModal = false" />
     </transition>
     <transition name="fade-scale">
       <FeedbackModal v-if="showFeedbackModal" @close="showFeedbackModal = false" />
@@ -310,18 +312,24 @@
 </template>
 
 <script setup>
+// Script setup defining reactive state, slot availability calculations, API booking submission, and PayMongo checkout callbacks
 import { ref, computed, onMounted } from 'vue';
 import ServiceSelector from '@/components/ServiceSelector.vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 import LoginModal from '@/components/LoginModal.vue';
-import RegisterSubModal from '@/components/RegisterSubModal.vue';
 import FeedbackModal from '@/components/FeedbackModal.vue';
+
 
 const errorModal = ref(null);
 const showLoginModal = ref(false);
-const showRegisterModal = ref(false);
+const loginModalInitialRegister = ref(false);
 const showFeedbackModal = ref(false);
 const showQr = ref(false);
+
+const openLoginModal = (isRegister = false) => {
+  loginModalInitialRegister.value = isRegister;
+  showLoginModal.value = true;
+};
 
 const services = ref([
   { service_id: 1, name: "Standard Car Wash", price: 250, duration: "60 Mins", desc: "Essential exterior cleaning and surface dirt removal." },

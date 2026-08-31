@@ -1,15 +1,24 @@
+/* 
+  Global stylesheet for Montage Auto Studio.
+  Imports Tailwind CSS layers, font configurations, custom scrollbars, and transition animations.
+*/
+
+/* Tailwind CSS base, components, and utility layers */
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* Google Web Fonts (Inter and Plus Jakarta Sans) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
+/* Base typography and body styling */
 body {
   font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
   background-color: #FAFAFA;
   color: #111111;
 }
 
+/* Minimal webkit scrollbar styling */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -21,6 +30,7 @@ body {
   border-radius: 2rem;
 }
 
+/* Modal animation keyframes */
 @keyframes modalFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -39,7 +49,7 @@ body {
   animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* Lightweight Vue Transition Classes */
+/* Vue route transition animation classes */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -77,4 +87,6 @@ body {
   opacity: 0;
   transform: scale(0.98);
 }
+
+
 

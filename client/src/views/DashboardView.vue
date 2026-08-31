@@ -1,44 +1,91 @@
+<!--
+  Member Dashboard View Component for Montage Auto Studio.
+  Provides authenticated member workspace featuring account overview, ₱0.00 VIP booking reservation,
+  rescheduling, cancellation, and subscription plan status monitoring.
+-->
 <template>
   <div class="min-h-screen flex flex-col md:flex-row bg-neutral-50 text-dark font-sans antialiased text-base">
     <!-- Sidebar container -->
-    <aside class="w-full md:w-72 bg-dark text-light flex flex-col justify-between p-6 border-r border-neutral-800 shrink-0">
-      <div class="space-y-10">
-        <div class="pb-6 border-b border-neutral-800 flex justify-between items-center relative">
-          <div>
+    <aside 
+      :class="[
+        'bg-dark text-light flex flex-col justify-between p-4 md:p-6 border-r border-neutral-800 shrink-0 transition-all duration-300 relative overflow-x-hidden',
+        isSidebarCollapsed ? 'w-full md:w-20' : 'w-full md:w-72'
+      ]"
+    >
+      <div class="space-y-8">
+        <div class="pb-4 border-b border-neutral-800 flex justify-between items-center relative">
+          <div v-if="!isSidebarCollapsed" class="overflow-hidden whitespace-nowrap">
             <div class="text-lg font-bold uppercase tracking-wider text-white">Montage Studio</div>
             <div class="text-xs text-neutral-400 tracking-widest uppercase font-mono mt-1.5">Member Hub</div>
           </div>
+          <button 
+            @click="toggleSidebar" 
+            :class="[
+              'p-2 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors focus:outline-none shrink-0',
+              isSidebarCollapsed ? 'mx-auto' : ''
+            ]"
+            :title="isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
+          >
+            <svg v-if="!isSidebarCollapsed" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
-        <nav class="space-y-4 text-xs font-bold uppercase tracking-wider text-neutral-400">
+        <nav class="space-y-3 text-xs font-bold uppercase tracking-wider text-neutral-400">
           <button 
             @click="activeView = 'overview'" 
-            :class="['w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none', activeView === 'overview' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white']"
+            :title="isSidebarCollapsed ? 'My Account' : ''"
+            :class="[
+              'w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none',
+              isSidebarCollapsed ? 'md:justify-center md:px-0' : '',
+              activeView === 'overview' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-            <span>My Account</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">My Account</span>
           </button>
           <button 
             @click="activeView = 'booking'" 
-            :class="['w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none', activeView === 'booking' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white']"
+            :title="isSidebarCollapsed ? 'Book New Session' : ''"
+            :class="[
+              'w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none',
+              isSidebarCollapsed ? 'md:justify-center md:px-0' : '',
+              activeView === 'booking' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-            <span>Book New Session</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Book New Session</span>
           </button>
           <button 
             @click="activeView = 'subscription'" 
-            :class="['w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none', activeView === 'subscription' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white']"
+            :title="isSidebarCollapsed ? 'Subscription Status' : ''"
+            :class="[
+              'w-full flex items-center space-x-3 p-4 rounded-full transition-all text-left font-bold focus:outline-none',
+              isSidebarCollapsed ? 'md:justify-center md:px-0' : '',
+              activeView === 'subscription' ? 'bg-neutral-900 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-            <span>Subscription Status</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Subscription Status</span>
           </button>
         </nav>
       </div>
 
       <div class="pt-6 border-t border-neutral-800">
-        <button @click="logout" class="w-full flex items-center justify-center space-x-3 text-sm font-bold bg-neutral-900 hover:bg-red-950 hover:text-red-200 border border-neutral-800 text-neutral-400 py-4 rounded-full tracking-widest uppercase transition-all focus:outline-none">
+        <button 
+          @click="logout" 
+          :title="isSidebarCollapsed ? 'Logout' : ''"
+          :class="[
+            'w-full flex items-center justify-center space-x-3 text-sm font-bold bg-neutral-900 hover:bg-red-950 hover:text-red-200 border border-neutral-800 text-neutral-400 py-4 rounded-full tracking-widest uppercase transition-all focus:outline-none',
+            isSidebarCollapsed ? 'md:px-0' : ''
+          ]"
+        >
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-          <span>Logout</span>
+          <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Logout</span>
         </button>
       </div>
     </aside>
@@ -366,6 +413,7 @@
 </template>
 
 <script setup>
+// Script setup for managing member workspace state, active appointments, ₱0.00 booking calculations, and subscription status
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ServiceSelector from '@/components/ServiceSelector.vue';
@@ -373,7 +421,13 @@ import RescheduleModal from '@/components/RescheduleModal.vue';
 import FeedbackModal from '@/components/FeedbackModal.vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 
+
 const router = useRouter();
+const isSidebarCollapsed = ref(false);
+const toggleSidebar = () => {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+};
+
 const activeView = ref('overview');
 const activeTab = ref('active');
 const welcomeName = ref(localStorage.getItem('subscriber_name') || 'VIP Member');

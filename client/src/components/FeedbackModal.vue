@@ -1,3 +1,8 @@
+<!--
+  Feedback Modal Component for Montage Auto Studio.
+  Allows customers to input a booking reference ID, automatically verifies session completion via API,
+  renders booking details, and collects 1-5 star ratings and comments.
+-->
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm p-4">
     <div class="bg-white p-6 sm:p-8 w-full max-w-md relative rounded-[2rem] shadow-2xl border border-neutral-200 animate-modal-scale-in">
@@ -98,6 +103,7 @@
 </template>
 
 <script setup>
+// Component reactive state and API interaction handlers
 import { ref, onMounted } from 'vue';
 
 const props = defineProps({
@@ -106,6 +112,7 @@ const props = defineProps({
     default: null
   }
 });
+
 
 const emit = defineEmits(['close', 'submitted']);
 

@@ -1,3 +1,7 @@
+<!--
+  Login & Account Registration Modal Component for Montage Auto Studio.
+  Provides tabbed authentication interface for member sign-in and user account registration with PayMongo pre-checkout redirection.
+-->
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm">
     <div class="bg-white p-8 w-full max-w-md relative rounded-[2rem] shadow-2xl mx-4 border border-neutral-200 animate-modal-scale-in">
@@ -121,13 +125,27 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+// Component reactive authentication and registration methods
+import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+
+
+const props = defineProps({
+  initialRegister: {
+    type: Boolean,
+    default: false
+  }
+});
 
 const emit = defineEmits(['close', 'openRegister']);
 const router = useRouter();
 
-const isRegister = ref(false);
+const isRegister = ref(props.initialRegister);
+
+watch(() => props.initialRegister, (newVal) => {
+  isRegister.value = newVal;
+});
+
 const showLoginPassword = ref(false);
 const showRegisterPassword = ref(false);
 const loading = ref(false);

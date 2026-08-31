@@ -1,67 +1,128 @@
+<!--
+  Admin Management View Component for Montage Auto Studio.
+  Provides administrative controls for booking status workflow, walk-in appointment creation,
+  payment proof verification, service catalog editing, and VIP subscriber roster management.
+-->
 <template>
   <div class="flex h-screen overflow-hidden bg-neutral-50 text-neutral-900 selection:bg-neutral-900 selection:text-white">
+
     <!-- Admin Sidebar -->
-    <aside class="w-72 md:w-80 bg-white border-r border-neutral-200 flex flex-col justify-between p-6 z-10 shrink-0">
-      <div class="space-y-12">
-        <div>
-          <h1 class="font-bold text-xs tracking-widest text-neutral-400">Admin</h1>
-          <p class="text-lg font-bold tracking-tight mt-1 text-black">Montage Auto Studio</p>
+    <aside 
+      :class="[
+        'bg-white border-r border-neutral-200 flex flex-col justify-between p-4 md:p-6 z-10 shrink-0 transition-all duration-300 relative overflow-x-hidden',
+        isSidebarCollapsed ? 'w-20' : 'w-72 md:w-80'
+      ]"
+    >
+      <div class="space-y-8">
+        <!-- Header & Toggle Button -->
+        <div class="flex items-center justify-between">
+          <div v-if="!isSidebarCollapsed" class="overflow-hidden whitespace-nowrap">
+            <h1 class="font-bold text-xs tracking-widest text-neutral-400">Admin</h1>
+            <p class="text-lg font-bold tracking-tight mt-1 text-black">Montage Auto Studio</p>
+          </div>
+          <button 
+            @click="toggleSidebar" 
+            :class="[
+              'p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-black transition-colors focus:outline-none shrink-0',
+              isSidebarCollapsed ? 'mx-auto' : ''
+            ]"
+            :title="isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
+          >
+            <svg v-if="!isSidebarCollapsed" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
         <nav class="space-y-2">
           <button 
             @click="activeTab = 'bookings'" 
-            :class="['w-full text-left flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold tracking-wide transition-all', activeTab === 'bookings' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black']"
+            :title="isSidebarCollapsed ? 'Bookings' : ''"
+            :class="[
+              'w-full text-left flex items-center gap-3 py-3 rounded-full text-sm font-semibold tracking-wide transition-all',
+              isSidebarCollapsed ? 'justify-center px-0' : 'px-4',
+              activeTab === 'bookings' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-            <span>Bookings</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Bookings</span>
           </button>
 
           <button 
             @click="activeTab = 'ledgers'" 
-            :class="['w-full text-left flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold tracking-wide transition-all', activeTab === 'ledgers' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black']"
+            :title="isSidebarCollapsed ? 'Payments' : ''"
+            :class="[
+              'w-full text-left flex items-center gap-3 py-3 rounded-full text-sm font-semibold tracking-wide transition-all',
+              isSidebarCollapsed ? 'justify-center px-0' : 'px-4',
+              activeTab === 'ledgers' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 8h6m-5 0a3 3 0 110 6H9l3 3m-3-6h6m6 1a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <span>Payments</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 8h6m-5 0a3 3 0 110 6H9l3 3m-3-6h6m6 1a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Payments</span>
           </button>
 
           <button 
             @click="activeTab = 'services'" 
-            :class="['w-full text-left flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold tracking-wide transition-all', activeTab === 'services' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black']"
+            :title="isSidebarCollapsed ? 'Service List' : ''"
+            :class="[
+              'w-full text-left flex items-center gap-3 py-3 rounded-full text-sm font-semibold tracking-wide transition-all',
+              isSidebarCollapsed ? 'justify-center px-0' : 'px-4',
+              activeTab === 'services' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
-            <span>Service List</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Service List</span>
           </button>
 
           <button 
             @click="activeTab = 'monitoring'" 
-            :class="['w-full text-left flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold tracking-wide transition-all', activeTab === 'monitoring' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black']"
+            :title="isSidebarCollapsed ? 'Subscriptions' : ''"
+            :class="[
+              'w-full text-left flex items-center gap-3 py-3 rounded-full text-sm font-semibold tracking-wide transition-all',
+              isSidebarCollapsed ? 'justify-center px-0' : 'px-4',
+              activeTab === 'monitoring' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            <span>Subscriptions</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Subscriptions</span>
           </button>
 
           <button 
             @click="activeTab = 'feedbacks'" 
-            :class="['w-full text-left flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold tracking-wide transition-all', activeTab === 'feedbacks' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black']"
+            :title="isSidebarCollapsed ? 'Customer Feedback' : ''"
+            :class="[
+              'w-full text-left flex items-center gap-3 py-3 rounded-full text-sm font-semibold tracking-wide transition-all',
+              isSidebarCollapsed ? 'justify-center px-0' : 'px-4',
+              activeTab === 'feedbacks' ? 'bg-black text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-black'
+            ]"
           >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-            <span>Customer Feedback</span>
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+            <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Customer Feedback</span>
           </button>
         </nav>
       </div>
 
       <div class="border-t border-neutral-100 pt-6 space-y-4">
-        <div class="flex items-center gap-3 px-2">
+        <div :class="['flex items-center gap-3', isSidebarCollapsed ? 'justify-center' : 'px-2']">
           <div class="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm shrink-0">A</div>
-          <div>
+          <div v-if="!isSidebarCollapsed" class="overflow-hidden whitespace-nowrap">
             <p class="text-sm font-bold text-black">Admin</p>
             <p class="text-xs text-neutral-400 font-medium tracking-wider uppercase">Manager</p>
           </div>
         </div>
-        <router-link to="/" class="w-full flex items-center justify-center gap-3 text-xs font-bold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 py-3.5 rounded-full tracking-wider uppercase transition-all">
+        <router-link 
+          to="/" 
+          :title="isSidebarCollapsed ? 'Sign Out' : ''"
+          :class="[
+            'w-full flex items-center justify-center gap-3 text-xs font-bold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 py-3.5 rounded-full tracking-wider uppercase transition-all',
+            isSidebarCollapsed ? 'px-0' : ''
+          ]"
+        >
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-          <span>Sign Out</span>
+          <span v-if="!isSidebarCollapsed" class="whitespace-nowrap">Sign Out</span>
         </router-link>
       </div>
     </aside>
@@ -328,8 +389,8 @@
             <!-- Stat 4: Top Rating Category -->
             <div class="bg-white border border-neutral-200 p-6 rounded-[2rem] shadow-sm">
               <span class="text-xs font-bold text-neutral-400 uppercase tracking-wider">Top Rating</span>
-              <div class="text-4xl font-black text-black mt-2">5 Stars</div>
-              <p class="text-[11px] text-neutral-400 mt-2 font-medium">{{ feedbackStats.fiveStarCount }} Ratings Recorded</p>
+              <div class="text-4xl font-black text-black mt-2">{{ feedbackStats.topRatingLabel }}</div>
+              <p class="text-[11px] text-neutral-400 mt-2 font-medium">{{ feedbackStats.topRatingCount }} Ratings Recorded</p>
             </div>
           </div>
 
@@ -435,6 +496,11 @@
 import { ref, computed, onMounted } from 'vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 
+const isSidebarCollapsed = ref(false);
+const toggleSidebar = () => {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+};
+
 const activeTab = ref('bookings');
 const bookingSlide = ref('pending');
 const bookingUserFilter = ref('all');
@@ -481,9 +547,11 @@ const feedbackStats = computed(() => {
   const total = feedbacks.value.length;
   if (total === 0) {
     return {
-      avgRating: '5.0',
-      satisfactionRate: 100,
+      avgRating: '0.0',
+      satisfactionRate: 0,
       fiveStarCount: 0,
+      topRatingLabel: 'N/A',
+      topRatingCount: 0,
       distribution: {
         5: { count: 0, percent: 0 },
         4: { count: 0, percent: 0 },
@@ -516,10 +584,24 @@ const feedbackStats = computed(() => {
     };
   });
 
+  let topStar = 5;
+  let maxCount = -1;
+  [5, 4, 3, 2, 1].forEach(star => {
+    if ((counts[star] || 0) > maxCount) {
+      maxCount = counts[star] || 0;
+      topStar = star;
+    }
+  });
+
+  const topRatingLabel = maxCount > 0 ? `${topStar} Star${topStar > 1 ? 's' : ''}` : 'N/A';
+  const topRatingCount = maxCount > 0 ? maxCount : 0;
+
   return {
     avgRating: avg,
     satisfactionRate: satRate,
     fiveStarCount: counts[5] || 0,
+    topRatingLabel,
+    topRatingCount,
     distribution
   };
 });

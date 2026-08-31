@@ -1,3 +1,7 @@
+<!--
+  Custom Service Selector Component for Montage Auto Studio.
+  Renders a custom dropdown menu for selecting detailing packages, formatting durations and VIP/regular pricing.
+-->
 <template>
   <div class="relative w-full">
     <!-- Custom Trigger Button -->
@@ -73,7 +77,9 @@
 </template>
 
 <script setup>
+// Component props, computed properties for active service filtering, and duration format helpers
 import { ref, computed } from 'vue';
+
 
 const props = defineProps({
   modelValue: {

@@ -1,3 +1,7 @@
+<!--
+  Forgot Password View Component for Montage Auto Studio.
+  3-step password recovery flow: 1) Email address submission, 2) 6-digit OTP code verification, 3) New password update.
+-->
 <template>
   <div class="bg-light text-dark font-sans antialiased flex items-center justify-center min-h-screen selection:bg-dark selection:text-light py-10">
     <div class="bg-white p-8 w-full max-w-sm rounded-[2rem] shadow-2xl border border-neutral-100 relative mx-4">
@@ -120,8 +124,10 @@
 </template>
 
 <script setup>
+// State management and API handlers for OTP generation, verification, and password updates
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+
 
 const router = useRouter();
 const step = ref(1);

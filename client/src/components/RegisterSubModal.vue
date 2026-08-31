@@ -1,3 +1,7 @@
+<!--
+  VIP Membership Roster Modal Component for Montage Auto Studio.
+  Collects new member registration details and redirects to PayMongo Hosted Checkout for ₱1,500 monthly VIP membership.
+-->
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm">
     <div class="bg-white p-8 w-full max-w-md relative rounded-[2.5rem] shadow-2xl mx-4 border border-neutral-200 animate-modal-scale-in">
@@ -56,7 +60,9 @@
 </template>
 
 <script setup>
+// VIP Registration form handling and API checkout redirection
 import { ref } from 'vue';
+
 
 const emit = defineEmits(['close']);
 const showPassword = ref(false);

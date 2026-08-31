@@ -1,3 +1,7 @@
+<!--
+  Reset Password View Component for Montage Auto Studio.
+  Form view for choosing a new password after successful identity verification.
+-->
 <template>
   <div class="bg-light text-dark font-sans antialiased flex items-center justify-center min-h-screen selection:bg-dark selection:text-light">
     <div class="bg-white p-8 w-full max-w-sm rounded-[2rem] shadow-2xl border border-neutral-100 relative mx-4">
@@ -75,8 +79,10 @@
 </template>
 
 <script setup>
+// Password reset form submission and route redirection to login
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+
 
 const router = useRouter();
 const newPassword = ref('');

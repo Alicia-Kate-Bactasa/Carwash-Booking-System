@@ -4,6 +4,28 @@ Montage Auto Studio is a full-stack auto detailing reservation and VIP membershi
 
 ---
 
+## Tech Stack
+
+### Frontend
+![Vue.js 3](https://img.shields.io/badge/Vue.js_3-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Vue Router](https://img.shields.io/badge/Vue_Router-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![PostCSS](https://img.shields.io/badge/PostCSS-DD3A0A?style=for-the-badge&logo=postcss&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+
+### Backend & Database
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Prisma ORM](https://img.shields.io/badge/Prisma_ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white)
+![Nodemailer](https://img.shields.io/badge/Nodemailer-0298C3?style=for-the-badge&logo=gmail&logoColor=white)
+![PayMongo API](https://img.shields.io/badge/PayMongo_API-0052FF?style=for-the-badge&logo=contactlesspayment&logoColor=white)
+
+---
+
 ## System Overview
 
 Montage Auto Studio offers structured auto detailing scheduling and membership management with distinct workflows:
@@ -107,6 +129,3 @@ To build the production frontend bundle:
 cd client
 npm run build
 ```
-
----
-

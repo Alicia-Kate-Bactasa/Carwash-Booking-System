@@ -1,3 +1,7 @@
+<!--
+  Booking Reschedule Modal Component for Montage Auto Studio.
+  Allows authenticated subscribers to update booking appointment date and time slot.
+-->
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm">
     <div class="bg-white border border-neutral-200 p-8 w-full max-w-md relative rounded-[2rem] shadow-2xl mx-4 animate-modal-scale-in">
@@ -35,7 +39,9 @@
 </template>
 
 <script setup>
+// Reschedule form handling, time slot selections, and PUT /api/v1/bookings/:id/reschedule API request
 import { ref } from 'vue';
+
 
 const props = defineProps({
   bookingId: { type: String, required: true },
@@ -49,7 +55,13 @@ const loading = ref(false);
 const errorMsg = ref('');
 
 const timeSlots = [
-  '09:00:00', '10:00:00', '11:00:00', '13:00:00', '14:00:00', '15:00:00', '16:00:00'
+  '09:00 AM - 10:00 AM',
+  '10:00 AM - 11:00 AM',
+  '11:00 AM - 12:00 PM',
+  '01:00 PM - 02:00 PM',
+  '02:00 PM - 03:00 PM',
+  '03:00 PM - 04:00 PM',
+  '04:00 PM - 05:00 PM'
 ];
 
 const handleReschedule = async () => {

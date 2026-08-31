@@ -1,3 +1,7 @@
+<!--
+  Global Error & Notification Modal Component for Montage Auto Studio.
+  Provides a programmatically-invoked Promise-based alert/notification modal dialog (show method).
+-->
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm">
     <div class="bg-white p-8 w-full max-w-sm relative rounded-[2rem] shadow-2xl mx-4 border border-neutral-200 animate-modal-scale-in">
@@ -31,10 +35,12 @@
 </template>
 
 <script setup>
+// Programmatic modal trigger exposing Promise resolution upon user acknowledgment
 import { ref } from 'vue';
 
 const isOpen = ref(false);
 const message = ref('');
+
 const isInfo = ref(false);
 let resolvePromise = null;
 
