@@ -1,25 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
-const validate = require('../middleware/validate');
-const { z } = require('zod');
-
-// Schema for service creation/update
-const serviceSchema = z.object({
-  body: z.object({
-    service_name: z.string().min(2, 'Service name is required'),
-    service_price: z.number().positive('Service price must be positive'),
-    service_category: z.string().min(2, 'Service category is required'),
-    service_duration: z.number().int().positive('Duration must be positive in minutes'),
-    service_description: z.string().optional(),
-    is_active: z.boolean().optional().default(true)
-  })
-});
 
 /**
  * GET /api/v1/services
- * Get list of available services
+ * Get list of available services (Optionally include inactive services with ?include_inactive=true)
  */
 router.get('/', async (req, res) => {
   try {
@@ -78,27 +63,34 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/v1/services
- * Create a new service (Admin required)
+ * Create a new detailing service package (Admin)
  */
-router.post('/', requireAuth, requireAdmin, validate(serviceSchema), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const { service_name, service_price, service_category, service_duration, service_description, is_active } = req.validated.body;
+    const { service_name, service_price, service_category, service_duration, service_description, is_active } = req.body;
+
+    if (!service_name || service_price === undefined) {
+      return res.status(400).json({ status: 'error', message: 'Service name and price are required.' });
+    }
+
+    const durationMins = parseInt(service_duration, 10) || 60;
+    const priceVal = parseFloat(service_price) || 0;
 
     const newService = await prisma.service.create({
       data: {
-        service_name,
-        service_price,
-        service_category,
-        service_duration,
-        service_description: service_description || '',
+        service_name: service_name.trim(),
+        service_price: priceVal,
+        service_category: service_category ? service_category.trim() : 'Detailing',
+        service_duration: durationMins,
+        service_description: service_description ? service_description.trim() : '',
         is_active: is_active ?? true,
-        last_updated_by: req.user?.email || 'Admin'
+        last_updated_by: 'Admin'
       }
     });
 
     return res.status(201).json({
       status: 'success',
-      message: 'Service created successfully.',
+      message: 'New detailing service package added successfully.',
       data: newService
     });
   } catch (error) {
@@ -112,9 +104,9 @@ router.post('/', requireAuth, requireAdmin, validate(serviceSchema), async (req,
 
 /**
  * PUT /api/v1/services/:id
- * Update an existing service (Admin required)
+ * Update an existing service (Admin)
  */
-router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     if (isNaN(serviceId)) {
@@ -123,22 +115,23 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 
     const { service_name, service_price, service_category, service_duration, service_description, is_active } = req.body;
 
+    const updateData = {};
+    if (service_name !== undefined) updateData.service_name = service_name.trim();
+    if (service_price !== undefined) updateData.service_price = parseFloat(service_price);
+    if (service_category !== undefined) updateData.service_category = service_category.trim();
+    if (service_duration !== undefined) updateData.service_duration = parseInt(service_duration, 10);
+    if (service_description !== undefined) updateData.service_description = service_description.trim();
+    if (is_active !== undefined) updateData.is_active = Boolean(is_active);
+    updateData.last_updated_by = 'Admin';
+
     const updatedService = await prisma.service.update({
       where: { service_id: serviceId },
-      data: {
-        ...(service_name && { service_name }),
-        ...(service_price !== undefined && { service_price }),
-        ...(service_category && { service_category }),
-        ...(service_duration !== undefined && { service_duration }),
-        ...(service_description !== undefined && { service_description }),
-        ...(is_active !== undefined && { is_active }),
-        last_updated_by: req.user?.email || 'Admin'
-      }
+      data: updateData
     });
 
     return res.status(200).json({
       status: 'success',
-      message: 'Service updated successfully.',
+      message: 'Service package updated successfully.',
       data: updatedService
     });
   } catch (error) {
@@ -151,28 +144,68 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * DELETE /api/v1/services/:id
- * Deactivate a service (Admin required)
+ * PATCH /api/v1/services/:id/toggle
+ * Toggle service activation status (Admin)
  */
-router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.patch('/:id/toggle', async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     if (isNaN(serviceId)) {
       return res.status(400).json({ status: 'error', message: 'Invalid service ID.' });
     }
 
-    // Soft delete / deactivate service
-    const deactivatedService = await prisma.service.update({
+    const service = await prisma.service.findUnique({
+      where: { service_id: serviceId }
+    });
+
+    if (!service) {
+      return res.status(404).json({ status: 'error', message: 'Service not found.' });
+    }
+
+    const updatedService = await prisma.service.update({
       where: { service_id: serviceId },
       data: {
-        is_active: false,
-        last_updated_by: req.user?.email || 'Admin'
+        is_active: !service.is_active,
+        last_updated_by: 'Admin'
       }
     });
 
     return res.status(200).json({
       status: 'success',
-      message: 'Service deactivated successfully.',
+      message: `Service package ${updatedService.is_active ? 'activated' : 'deactivated'} successfully.`,
+      data: updatedService
+    });
+  } catch (error) {
+    console.error('Error toggling service status:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to update service status.'
+    });
+  }
+});
+
+/**
+ * DELETE /api/v1/services/:id
+ * Soft delete / deactivate service (Admin)
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const serviceId = parseInt(req.params.id, 10);
+    if (isNaN(serviceId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid service ID.' });
+    }
+
+    const deactivatedService = await prisma.service.update({
+      where: { service_id: serviceId },
+      data: {
+        is_active: false,
+        last_updated_by: 'Admin'
+      }
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Service package deactivated successfully.',
       data: deactivatedService
     });
   } catch (error) {

@@ -61,6 +61,7 @@ enum PlanStatus {
 
 enum UserRole {
   Admin
+  Subscriber
   Customer
 
   @@map("user_role_enum")
@@ -99,7 +100,7 @@ model User {
   subscriptions    Subscription[]
   security_actions UserSecurityAction[]
 
-  @@map("user")
+  @@map("users")
 }
 
 model Customer {

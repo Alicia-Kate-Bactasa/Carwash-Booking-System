@@ -43,29 +43,66 @@ router.get('/user/bookings', async (req, res) => {
 
 /**
  * POST /api/v1/bookings/member
- * Create member booking
+ * Create member VIP booking (VIP FREE - 0 Pesos Invoice)
  */
 router.post('/member', async (req, res) => {
   try {
     const { service_id, scheduled_date, time_slot } = req.body;
     if (!service_id || !scheduled_date || !time_slot) {
-      return res.status(400).json({ status: 'error', message: 'Missing required booking fields.' });
+      return res.status(400).json({ status: 'error', message: 'Missing required booking fields (service_id, scheduled_date, time_slot).' });
     }
 
-    const newBooking = await prisma.booking.create({
-      data: {
-        service_id: parseInt(service_id, 10),
+    const serviceId = parseInt(service_id, 10);
+    const service = await prisma.service.findUnique({ where: { service_id: serviceId } });
+    if (!service || !service.is_active) {
+      return res.status(404).json({ status: 'error', message: 'Requested service package is inactive or not found.' });
+    }
+
+    // Check slot collision
+    const existingConflict = await prisma.booking.findFirst({
+      where: {
         scheduled_date: new Date(scheduled_date),
         time_slot,
-        purchased_price: 0,
-        booking_status: 'Confirmed'
+        booking_status: { notIn: ['Cancelled', 'No_Show'] }
       }
     });
 
-    return res.status(201).json({ status: 'success', data: newBooking });
+    if (existingConflict) {
+      return res.status(409).json({ status: 'error', message: `Time slot ${time_slot} on ${scheduled_date} is already occupied.` });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const newBooking = await tx.booking.create({
+        data: {
+          service_id: serviceId,
+          scheduled_date: new Date(scheduled_date),
+          time_slot,
+          bay_number: 1,
+          purchased_price: 0.00,
+          booking_status: 'Confirmed'
+        }
+      });
+
+      const newInvoice = await tx.invoice.create({
+        data: {
+          booking_id: newBooking.booking_id,
+          total_amount: 0.00,
+          invoice_type: 'Single_Detailing',
+          invoice_status: 'Paid'
+        }
+      });
+
+      return { booking: newBooking, invoice: newInvoice };
+    });
+
+    return res.status(201).json({
+      status: 'success',
+      message: 'VIP Appointment reserved successfully at ₱0.00 invoice!',
+      data: result
+    });
   } catch (error) {
     console.error('Error creating member booking:', error);
-    return res.status(500).json({ status: 'error', message: 'Failed to reserve booking session.' });
+    return res.status(500).json({ status: 'error', message: 'Failed to reserve VIP booking session.' });
   }
 });
 
@@ -86,8 +123,8 @@ router.get('/', requireAuth, async (req, res) => {
         create: {
           email: req.user.email,
           username: req.user.email.split('@')[0] + '-' + Date.now().toString(36),
-          password: 'supabase-managed',
-          role: 'Customer'
+          password: 'managed_account',
+          role: 'Subscriber'
         }
       });
       where.user_id = dbUser.user_id;
@@ -332,14 +369,42 @@ router.put('/:id/reschedule', requireAuth, async (req, res) => {
       return res.status(409).json({ status: 'error', message: 'Selected time slot is already occupied.' });
     }
 
+    const oldDateStr = booking.scheduled_date ? booking.scheduled_date.toISOString().split('T')[0] : 'N/A';
+    const oldTimeStr = booking.time_slot || 'N/A';
+
     const updatedBooking = await prisma.booking.update({
       where: { booking_id: bookingId },
       data: {
         scheduled_date: new Date(scheduled_date),
         time_slot,
         ...(bay_number && { bay_number })
+      },
+      include: {
+        service: true,
+        customer: true,
+        user: true,
+        invoices: true
       }
     });
+
+    const recipientEmail = updatedBooking.customer?.email || updatedBooking.user?.email;
+    const recipientName = updatedBooking.customer?.full_name || updatedBooking.user?.username;
+    const invoiceId = updatedBooking.invoices[0]?.invoice_id || bookingId;
+
+    if (recipientEmail) {
+      const { sendRescheduleEmail } = require('../services/mailer');
+      sendRescheduleEmail({
+        to: recipientEmail,
+        clientName: recipientName,
+        bookingId: updatedBooking.booking_id,
+        invoiceId,
+        serviceName: updatedBooking.service?.service_name,
+        oldDate: oldDateStr,
+        oldTime: oldTimeStr,
+        newDate: scheduled_date,
+        newTime: time_slot
+      }).catch(e => console.error('Reschedule Email Error:', e));
+    }
 
     return res.status(200).json({
       status: 'success',
@@ -360,7 +425,10 @@ router.put('/:id/cancel', requireAuth, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id, 10);
 
-    const booking = await prisma.booking.findUnique({ where: { booking_id: bookingId } });
+    const booking = await prisma.booking.findUnique({
+      where: { booking_id: bookingId },
+      include: { service: true, customer: true, user: true, invoices: true }
+    });
     if (!booking) {
       return res.status(404).json({ status: 'error', message: 'Booking not found.' });
     }
@@ -375,6 +443,21 @@ router.put('/:id/cancel', requireAuth, async (req, res) => {
       where: { booking_id: bookingId, invoice_status: 'Pending' },
       data: { invoice_status: 'Void' }
     });
+
+    const recipientEmail = booking.customer?.email || booking.user?.email;
+    const recipientName = booking.customer?.full_name || booking.user?.username;
+    const invoiceId = booking.invoices[0]?.invoice_id || bookingId;
+
+    if (recipientEmail) {
+      const { sendUserCancelBookingEmail } = require('../services/mailer');
+      sendUserCancelBookingEmail({
+        to: recipientEmail,
+        clientName: recipientName,
+        bookingId: booking.booking_id,
+        invoiceId,
+        serviceName: booking.service?.service_name
+      }).catch(e => console.error('Cancel Booking Email Error:', e));
+    }
 
     return res.status(200).json({
       status: 'success',

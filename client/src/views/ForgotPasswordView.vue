@@ -142,20 +142,21 @@ const handleSendOtp = async () => {
   statusMsg.value = '';
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    await fetch(`${apiBase}/auth/forgot-password`, {
+    const res = await fetch(`${apiBase}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.value.trim() })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Failed to dispatch verification code.');
+
     step.value = 2;
     subtitle.value = `Verification code sent to ${email.value.trim()}. Please enter code below.`;
     statusMsg.value = 'Code dispatched! Check your email inbox.';
     isSuccess.value = true;
   } catch (err) {
-    step.value = 2;
-    subtitle.value = `Verification code sent to ${email.value.trim()}. Please enter code below.`;
-    statusMsg.value = 'Code dispatched! Check your email inbox.';
-    isSuccess.value = true;
+    statusMsg.value = err.message || 'Failed to send verification code.';
+    isSuccess.value = false;
   } finally {
     loading.value = false;
   }
@@ -171,20 +172,21 @@ const handleVerifyOtp = async () => {
   statusMsg.value = '';
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    await fetch(`${apiBase}/auth/verify-otp`, {
+    const res = await fetch(`${apiBase}/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value.trim(), code: otp.value.trim() })
+      body: JSON.stringify({ email: email.value.trim(), otp: otp.value.trim() })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Invalid or expired 6-digit code.');
+
     step.value = 3;
     subtitle.value = 'Choose a secure new password for your account.';
-    statusMsg.value = 'OTP verified! Enter your new password.';
+    statusMsg.value = 'OTP code verified! Please enter your new password.';
     isSuccess.value = true;
   } catch (err) {
-    step.value = 3;
-    subtitle.value = 'Choose a secure new password for your account.';
-    statusMsg.value = 'OTP verified! Enter your new password.';
-    isSuccess.value = true;
+    statusMsg.value = err.message || 'Invalid or expired verification code.';
+    isSuccess.value = false;
   } finally {
     loading.value = false;
   }
@@ -206,22 +208,22 @@ const handleResetPassword = async () => {
   statusMsg.value = '';
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    await fetch(`${apiBase}/auth/reset-password`, {
+    const res = await fetch(`${apiBase}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value.trim(), password: newPassword.value })
+      body: JSON.stringify({ email: email.value.trim(), otp: otp.value.trim(), password: newPassword.value })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Failed to update password.');
+
     statusMsg.value = 'Password updated successfully! Redirecting to login...';
     isSuccess.value = true;
     setTimeout(() => {
       router.push('/');
     }, 1500);
   } catch (err) {
-    statusMsg.value = 'Password updated successfully! Redirecting to login...';
-    isSuccess.value = true;
-    setTimeout(() => {
-      router.push('/');
-    }, 1500);
+    statusMsg.value = err.message || 'Failed to update password.';
+    isSuccess.value = false;
   } finally {
     loading.value = false;
   }

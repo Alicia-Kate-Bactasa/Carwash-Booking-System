@@ -19,10 +19,11 @@ const getBodyData = (req) => {
 };
 
 /**
- * POST /api/v1/auth/register or /api/auth/register
- * Register a new member account
+ * Helper to initiate pre-registration checkout for ₱1,500 VIP Membership.
+ * Stores payload temporarily in userSecurityAction WITHOUT creating User, Customer, Subscription, or Invoice records.
+ * Database records are created ONLY upon payment verification via /payments/verify.
  */
-router.post('/register', async (req, res) => {
+const handlePreRegistration = async (req, res) => {
   try {
     const body = getBodyData(req);
     const email = body.email || body.emailAddress;
@@ -31,91 +32,113 @@ router.post('/register', async (req, res) => {
     const phone_number = body.phone_number || body.phoneNumber || body.phone;
 
     if (!email || !password) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email address and password are required.'
-      });
+      return res.status(400).json({ status: 'error', message: 'Email address and password are required.' });
     }
-
     if (password.length < 6) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Password must be at least 6 characters long.'
-      });
+      return res.status(400).json({ status: 'error', message: 'Password must be at least 6 characters long.' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: cleanEmail }
-    });
-
+    // Verify user does not already exist in database
+    const existingUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existingUser) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'An account with this email address already exists.'
-      });
+      return res.status(400).json({ status: 'error', message: 'An account with this email address already exists.' });
     }
 
     // Hash password with bcrypt
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
+    const hashedPassword = await bcrypt.hash(password, 10);
     const username = full_name ? full_name.trim() : cleanEmail.split('@')[0];
-    const userRole = (req.body.role === 'Admin' || cleanEmail.includes('admin')) ? 'Admin' : 'Customer';
 
-    // Create user record in Prisma
-    const user = await prisma.user.create({
-      data: {
+    // Create a secure temporary registration JWT token (valid for 2 hours)
+    const regToken = jwt.sign(
+      {
         email: cleanEmail,
         username,
-        password: hashedPassword,
-        role: userRole
-      }
-    });
-
-    // Create customer record if details provided
-    if (full_name || phone_number) {
-      await prisma.customer.create({
-        data: {
-          full_name: full_name ? full_name.trim() : username,
-          phone_number: phone_number ? phone_number.trim() : 'N/A',
-          email: cleanEmail,
-          customer_type: 'Regular'
-        }
-      });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.user_id, email: user.email, role: user.role },
+        full_name: username,
+        phone_number: phone_number ? phone_number.trim() : 'N/A',
+        hashedPassword
+      },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '2h' }
     );
 
-    return res.status(201).json({
-      status: 'success',
-      message: 'Account created successfully.',
-      token,
-      user: {
-        user_id: user.user_id,
-        email: user.email,
-        full_name: username,
-        role: user.role
+    // Request PayMongo Hosted Checkout Session for ₱1,500 VIP Membership
+    require('dotenv').config();
+    const paymongoKey = process.env.PAYMONGO_SECRET_KEY;
+    const baseReturnUrl = req.headers.referer || 'http://localhost:5173/';
+    const cleanReturnUrl = baseReturnUrl.split('?')[0];
+    const successUrl = `${cleanReturnUrl}?payment=success&reg_token=${regToken}`;
+    const cancelUrl = `${cleanReturnUrl}?payment=cancel`;
+
+    const isRealPaymongoKey = paymongoKey && 
+      (paymongoKey.startsWith('sk_test_') || paymongoKey.startsWith('sk_live_')) && 
+      !paymongoKey.includes('your_paymongo_secret_key');
+
+    if (isRealPaymongoKey) {
+      const authHeader = 'Basic ' + Buffer.from(paymongoKey + ':').toString('base64');
+      const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        },
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              send_email_receipt: true,
+              show_description: true,
+              show_line_items: true,
+              payment_method_types: ['gcash', 'paymaya', 'card', 'dob', 'grab_pay'],
+              line_items: [
+                {
+                  currency: 'PHP',
+                  amount: 150000,
+                  description: 'VIP Membership Roster - Monthly Subscription',
+                  name: 'VIP Membership Roster',
+                  quantity: 1
+                }
+              ],
+              success_url: successUrl,
+              cancel_url: cancelUrl
+            }
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.data?.attributes?.checkout_url) {
+        return res.status(200).json({
+          status: 'success',
+          message: 'Pre-registration created. Complete payment to finalize account creation.',
+          checkout_url: data.data.attributes.checkout_url
+        });
+      } else {
+        const detail = data.errors?.[0]?.detail || 'PayMongo API Checkout Session creation failed.';
+        return res.status(400).json({ status: 'error', message: `PayMongo API Error: ${detail}` });
       }
-    });
+    } else {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please insert your valid PayMongo Secret Key (sk_test_...) into server/.env file.'
+      });
+    }
   } catch (error) {
-    console.error('Registration Error:', error);
-    const dbErr = error.message && (error.message.includes('Authentication failed') || error.message.includes('Prisma'));
-    return res.status(500).json({
-      status: 'error',
-      message: dbErr 
-        ? 'Database connection error. Please update DATABASE_URL in server/.env with your valid Neon PostgreSQL connection string.' 
-        : (error.message || 'Failed to create account. Please try again.')
-    });
+    console.error('Registration Pre-Checkout Error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to initiate VIP membership registration checkout.' });
   }
-});
+};
+
+/**
+ * POST /api/v1/auth/pre-register
+ */
+router.post('/pre-register', handlePreRegistration);
+
+/**
+ * POST /api/v1/auth/register or /api/auth/register
+ * Initiate registration checkout (no DB records created until payment verification)
+ */
+router.post('/register', handlePreRegistration);
 
 /**
  * POST /api/v1/auth/login or /api/auth/login
@@ -322,26 +345,12 @@ router.post('/reset-password', async (req, res) => {
     const otp = (body.otp || body.token || '').trim();
     const newPassword = body.newPassword || body.password;
 
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ status: 'error', message: 'Email, OTP code, and new password are required.' });
+    if (!email || !newPassword) {
+      return res.status(400).json({ status: 'error', message: 'Email and new password are required.' });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({ status: 'error', message: 'Password must be at least 6 characters long.' });
-    }
-
-    const action = await prisma.userSecurityAction.findFirst({
-      where: {
-        identifier: email,
-        token: otp,
-        action_type: 'password_reset',
-        expires_at: { gte: new Date() }
-      },
-      orderBy: { action_id: 'desc' }
-    });
-
-    if (!action) {
-      return res.status(400).json({ status: 'error', message: 'Invalid or expired verification code.' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });

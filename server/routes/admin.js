@@ -68,22 +68,143 @@ router.get('/subscriptions', async (req, res) => {
 
 /**
  * PUT /api/v1/admin/bookings/:id/status
- * Update booking status
+ * Update booking status and send HTML notification email
  */
 router.put('/bookings/:id/status', async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id, 10);
-    const { booking_status } = req.body;
+    const { booking_status, reason } = req.body;
 
     const updated = await prisma.booking.update({
       where: { booking_id: bookingId },
-      data: { booking_status }
+      data: { booking_status },
+      include: {
+        service: true,
+        customer: true,
+        user: true,
+        invoices: true
+      }
     });
+
+    const recipientEmail = updated.customer?.email || updated.user?.email;
+    const recipientName = updated.customer?.full_name || updated.user?.username;
+    const invoiceId = updated.invoices[0]?.invoice_id || bookingId;
+
+    if (recipientEmail) {
+      const { sendAdminCompleteBookingEmail, sendAdminCancelBookingEmail } = require('../services/mailer');
+      if (booking_status === 'Completed') {
+        sendAdminCompleteBookingEmail({
+          to: recipientEmail,
+          clientName: recipientName,
+          bookingId: updated.booking_id,
+          invoiceId,
+          serviceName: updated.service?.service_name
+        }).catch(e => console.error('Admin Complete Email Error:', e));
+      } else if (booking_status === 'Cancelled') {
+        sendAdminCancelBookingEmail({
+          to: recipientEmail,
+          clientName: recipientName,
+          bookingId: updated.booking_id,
+          invoiceId,
+          serviceName: updated.service?.service_name,
+          reason
+        }).catch(e => console.error('Admin Cancel Email Error:', e));
+      }
+    }
 
     return res.status(200).json({ status: 'success', data: updated });
   } catch (error) {
     console.error('Error updating booking status:', error);
     return res.status(500).json({ status: 'error', message: 'Failed to update booking status.' });
+  }
+});
+
+/**
+ * POST /api/v1/admin/walkin
+ * Admin creates completed walk-in booking form
+ */
+router.post('/walkin', async (req, res) => {
+  try {
+    const { full_name, phone_number, email, service_id, scheduled_date, time_slot, price } = req.body;
+
+    if (!full_name || !service_id) {
+      return res.status(400).json({ status: 'error', message: 'full_name and service_id are required.' });
+    }
+
+    const service = await prisma.service.findUnique({ where: { service_id: parseInt(service_id, 10) } });
+    const finalPrice = parseFloat(price) || service?.service_price || 250.00;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create Walk-In Customer
+      const customer = await tx.customer.create({
+        data: {
+          full_name,
+          phone_number: phone_number || 'Walk-In Counter',
+          email: email || null,
+          customer_type: 'Walk_In',
+          booking_count: 1
+        }
+      });
+
+      // 2. Create Booking
+      const booking = await tx.booking.create({
+        data: {
+          customer_id: customer.customer_id,
+          service_id: parseInt(service_id, 10),
+          scheduled_date: scheduled_date ? new Date(scheduled_date) : new Date(),
+          time_slot: time_slot || 'Walk-In Immediate',
+          bay_number: 1,
+          purchased_price: finalPrice,
+          booking_status: 'Completed'
+        }
+      });
+
+      // 3. Create Paid Invoice
+      const invoice = await tx.invoice.create({
+        data: {
+          booking_id: booking.booking_id,
+          total_amount: finalPrice,
+          invoice_type: 'Single_Detailing',
+          invoice_status: 'Paid'
+        }
+      });
+
+      // 4. Create Payment
+      await tx.payment.create({
+        data: {
+          invoice_id: invoice.invoice_id,
+          amount: finalPrice,
+          payment_method: 'Cash/Counter',
+          proof_of_payment: 'ADMIN_WALKIN_PAID',
+          payment_status: 'Paid'
+        }
+      });
+
+      return { customer, booking, invoice };
+    });
+
+    if (email) {
+      const { sendWalkInBookingEmail } = require('../services/mailer');
+      sendWalkInBookingEmail({
+        to: email,
+        clientName: full_name,
+        bookingId: result.booking.booking_id,
+        invoiceId: result.invoice.invoice_id,
+        serviceName: service?.service_name || 'Walk-In Detailing',
+        scheduledDate: scheduled_date || 'Today',
+        timeSlot: time_slot || 'Counter',
+        price: finalPrice
+      }).catch(e => console.error('Walk-In Email Error:', e));
+    }
+
+    return res.status(201).json({
+      status: 'success',
+      message: 'Walk-in booking created and receipt generated successfully.',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error creating walk-in booking:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to log walk-in booking.' });
   }
 });
 

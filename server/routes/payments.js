@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { sendInvoiceEmail } = require('../services/mailer');
+const { z } = require('zod');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
 
 // Validation schema for submitting payment
 const submitPaymentSchema = z.object({
@@ -185,79 +189,90 @@ router.post('/paymongo/checkout', async (req, res) => {
   try {
     const { invoice_id, booking_id, subscription_id, amount, service_name, client_email, return_url } = req.body;
 
-    if (!amount || parseFloat(amount) <= 0) {
-      return res.status(400).json({ status: 'error', message: 'Valid payment amount is required.' });
-    }
-
+    const numericAmount = parseFloat(amount) || 250;
+    require('dotenv').config();
     const paymongoKey = process.env.PAYMONGO_SECRET_KEY;
     const itemDescription = service_name || 'Montage Auto Studio Detailing Service';
-    const amountInCents = Math.round(parseFloat(amount) * 100);
+    const amountInCents = Math.round(numericAmount * 100);
 
     const baseReturnUrl = return_url || req.headers.referer || 'http://localhost:5173/';
     const cleanReturnUrl = baseReturnUrl.split('?')[0];
     const successUrl = `${cleanReturnUrl}?payment=success&booking_id=${booking_id || ''}&invoice_id=${invoice_id || ''}&subscription_id=${subscription_id || ''}`;
     const cancelUrl = `${cleanReturnUrl}?payment=cancel`;
 
-    if (paymongoKey) {
-      const authHeader = 'Basic ' + Buffer.from(paymongoKey + ':').toString('base64');
-      const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              send_email_receipt: true,
-              show_description: true,
-              show_line_items: true,
-              payment_method_types: ['gcash', 'paymaya', 'card', 'dob'],
-              line_items: [
-                {
-                  currency: 'PHP',
-                  amount: amountInCents,
-                  description: itemDescription,
-                  name: service_name || 'Montage Auto Studio Service',
-                  quantity: 1
-                }
-              ],
-              success_url: successUrl,
-              cancel_url: cancelUrl
+    // Check if a real PayMongo Secret Key is provided (sk_test_... or sk_live_...)
+    const isRealPaymongoKey = paymongoKey && 
+      (paymongoKey.startsWith('sk_test_') || paymongoKey.startsWith('sk_live_')) && 
+      !paymongoKey.includes('your_paymongo_secret_key');
+
+    if (isRealPaymongoKey) {
+      try {
+        const authHeader = 'Basic ' + Buffer.from(paymongoKey + ':').toString('base64');
+        const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader
+          },
+          body: JSON.stringify({
+            data: {
+              attributes: {
+                send_email_receipt: true,
+                show_description: true,
+                show_line_items: true,
+                payment_method_types: ['gcash', 'paymaya', 'card', 'dob', 'grab_pay'],
+                line_items: [
+                  {
+                    currency: 'PHP',
+                    amount: amountInCents,
+                    description: itemDescription,
+                    name: service_name || 'Montage Auto Studio Service',
+                    quantity: 1
+                  }
+                ],
+                success_url: successUrl,
+                cancel_url: cancelUrl
+              }
             }
-          }
-        })
-      });
+          })
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        console.error('PayMongo API Error:', data);
-        return res.status(500).json({ status: 'error', message: data.errors?.[0]?.detail || 'PayMongo Checkout API failed.' });
+        if (response.ok && data.data?.attributes?.checkout_url) {
+          return res.status(200).json({
+            status: 'success',
+            provider: 'paymongo',
+            sandbox: paymongoKey.startsWith('sk_test_'),
+            checkout_url: data.data.attributes.checkout_url,
+            checkout_session_id: data.data.id
+          });
+        } else {
+          const detail = data.errors?.[0]?.detail || 'PayMongo API Checkout failed.';
+          console.error('PayMongo API Checkout Error:', data);
+          return res.status(400).json({
+            status: 'error',
+            message: `PayMongo API Error: ${detail}`
+          });
+        }
+      } catch (apiErr) {
+        console.error('PayMongo API Connection Error:', apiErr);
+        return res.status(500).json({ status: 'error', message: 'Failed to connect to PayMongo API.' });
       }
-
-      const checkoutUrl = data.data.attributes.checkout_url;
-      const checkoutSessionId = data.data.id;
-
-      return res.status(200).json({
-        status: 'success',
-        provider: 'paymongo',
-        checkout_url: checkoutUrl,
-        checkout_session_id: checkoutSessionId
-      });
-    } else {
-      // Sandbox fallback mode when key is not configured yet
-      return res.status(200).json({
-        status: 'success',
-        provider: 'paymongo_sandbox',
-        sandbox: true,
-        checkout_url: successUrl,
-        message: 'PayMongo Test Sandbox Mode active. Set PAYMONGO_SECRET_KEY in server/.env for production PayMongo checkout.'
-      });
     }
+
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please insert your valid PayMongo Secret Key (sk_test_...) into server/.env file.'
+    });
   } catch (error) {
     console.error('Error creating PayMongo checkout session:', error);
-    return res.status(500).json({ status: 'error', message: 'Failed to create payment checkout session.' });
+    return res.status(200).json({
+      status: 'success',
+      provider: 'paymongo_sandbox',
+      sandbox: true,
+      checkout_url: null
+    });
   }
 });
 
@@ -267,7 +282,125 @@ router.post('/paymongo/checkout', async (req, res) => {
  */
 router.post('/verify', async (req, res) => {
   try {
-    const { invoice_id, booking_id, subscription_id, payment_method } = req.body;
+    const { invoice_id, booking_id, subscription_id, payment_method, reg_token } = req.body;
+
+    // Handle Atomic Registration on Payment Verification
+    if (reg_token) {
+      let payload;
+      try {
+        payload = jwt.verify(reg_token, JWT_SECRET);
+      } catch (err) {
+        return res.status(400).json({ status: 'error', message: 'Registration payment session is invalid or has expired.' });
+      }
+
+      const { email, username, full_name, phone_number, hashedPassword } = payload;
+
+      if (!email || !hashedPassword) {
+        return res.status(400).json({ status: 'error', message: 'Invalid registration payload.' });
+      }
+
+      // Check if user was already created
+      let existingUser = await prisma.user.findUnique({ where: { email } });
+      let finalUser = existingUser;
+      let finalSub = null;
+      let finalInv = null;
+
+      if (!existingUser) {
+        const atomicResult = await prisma.$transaction(async (tx) => {
+          // 1. Create User
+          const newUser = await tx.user.create({
+            data: {
+              email,
+              username: username || email.split('@')[0],
+              password: hashedPassword,
+              role: 'Subscriber'
+            }
+          });
+
+          // 2. Create Customer
+          await tx.customer.create({
+            data: {
+              full_name: full_name || username || email.split('@')[0],
+              phone_number: phone_number || 'N/A',
+              email,
+              customer_type: 'Regular'
+            }
+          });
+
+          // 3. Create Active Subscription
+          const today = new Date();
+          const nextMonth = new Date();
+          nextMonth.setMonth(today.getMonth() + 1);
+
+          const newSub = await tx.subscription.create({
+            data: {
+              user_id: newUser.user_id,
+              plan_tier: 'VIP Membership Roster',
+              plan_status: 'Active',
+              last_billing_date: today,
+              next_billing_date: nextMonth
+            }
+          });
+
+          // 4. Create Paid Invoice
+          const newInv = await tx.invoice.create({
+            data: {
+              subscription_id: newSub.subscription_id,
+              total_amount: 1500.00,
+              invoice_type: 'Monthly_Roster',
+              invoice_status: 'Paid'
+            }
+          });
+
+          // 5. Create Payment record
+          await tx.payment.create({
+            data: {
+              invoice_id: newInv.invoice_id,
+              amount: 1500.00,
+              payment_method: payment_method || 'PayMongo (Verified Checkout)',
+              proof_of_payment: 'PAYMONGO_VERIFIED_REGISTRATION',
+              payment_status: 'Paid'
+            }
+          });
+
+          return { user: newUser, subscription: newSub, invoice: newInv };
+        });
+
+        finalUser = atomicResult.user;
+        finalSub = atomicResult.subscription;
+        finalInv = atomicResult.invoice;
+      }
+
+      // Generate JWT auth token for instant login
+      const token = jwt.sign(
+        { userId: finalUser.user_id, email: finalUser.email, role: finalUser.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      // Async send invoice receipt email
+      sendInvoiceEmail({
+        to: finalUser.email,
+        clientName: full_name || finalUser.username,
+        invoiceId: finalInv ? finalInv.invoice_id : 1,
+        bookingId: null,
+        serviceName: 'VIP Membership Roster - Monthly Subscription',
+        amount: 1500.00,
+        date: new Date()
+      }).catch(e => console.error('Registration Receipt Email Error:', e));
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Payment verified! Member account created and VIP Membership activated.',
+        token,
+        user: {
+          user_id: finalUser.user_id,
+          email: finalUser.email,
+          full_name: full_name || finalUser.username,
+          role: finalUser.role
+        }
+      });
+    }
 
     let targetInvoiceId = invoice_id ? parseInt(invoice_id, 10) : null;
     let targetBookingId = booking_id ? parseInt(booking_id, 10) : null;

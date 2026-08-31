@@ -24,7 +24,12 @@
     <!-- HERO / INTRO SECTION -->
     <section class="relative min-h-[calc(100vh-5rem)] flex items-center justify-center bg-dark text-light overflow-hidden">
       <div class="absolute inset-0 bg-neutral-900 bg-cover bg-center mix-blend-overlay opacity-30" style="background-image: url('https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&q=80&w=1200');"></div>
-      <div class="relative max-w-4xl mx-auto px-6 text-center z-10 py-12">
+      <div 
+        v-motion
+        :initial="{ opacity: 0, y: 20 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 500, ease: 'easeOut' } }"
+        class="relative max-w-4xl mx-auto px-6 text-center z-10 py-12"
+      >
         <h1 class="text-4xl sm:text-6xl font-black tracking-tight uppercase mb-6 leading-tight">
           Premium Car Care,<br>Scheduled Around Your Lifestyle.
         </h1>
@@ -45,8 +50,12 @@
     <!-- ABOUT / FACILITY SECTION -->
     <section id="about" class="py-24 border-b border-neutral-200/60 bg-white">
       <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-        <div class="aspect-[4/3] bg-neutral-100 bg-cover bg-center border border-neutral-200/60 rounded-3xl overflow-hidden shadow-inner" style="background-image: url('https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80&w=800');"></div>
-        <div>
+        <div 
+          v-motion-fade-visible-once
+          class="aspect-[4/3] bg-neutral-100 bg-cover bg-center border border-neutral-200/60 rounded-3xl overflow-hidden shadow-inner" 
+          style="background-image: url('https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80&w=800');"
+        ></div>
+        <div v-motion-fade-visible-once>
           <span class="text-xs font-bold tracking-widest uppercase text-neutral-400 block mb-2">Our Facility</span>
           <h2 class="text-3xl font-black tracking-tight uppercase mb-6">Built For Uncompromising Efficiency</h2>
           <p class="text-neutral-600 font-light text-sm leading-relaxed mb-8">
@@ -69,15 +78,18 @@
     <!-- SERVICES / CATALOG SECTION -->
     <section id="menu" class="py-24 border-b border-neutral-200/60">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center max-w-2xl mx-auto mb-16">
+        <div v-motion-fade-visible-once class="text-center max-w-2xl mx-auto mb-16">
           <span class="text-xs font-bold tracking-widest uppercase text-neutral-400 block mb-2">Service Selection</span>
           <h2 class="text-3xl font-black tracking-tight uppercase">Choose a Service</h2>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div 
-            v-for="service in services" 
+            v-for="(service, idx) in services" 
             :key="service.service_id || service.name" 
+            v-motion
+            :initial="{ opacity: 0, y: 15 }"
+            :visibleOnce="{ opacity: 1, y: 0, transition: { duration: 400, delay: idx * 80 } }"
             class="bg-white border border-neutral-200 p-8 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
             <div>
@@ -105,7 +117,7 @@
     <!-- SUBSCRIPTION / VIP SECTION -->
     <section id="subscription" class="py-24 bg-dark text-light border-t border-b border-neutral-800">
       <div class="max-w-4xl mx-auto px-6">
-        <div class="border border-neutral-800 p-8 sm:p-12 bg-neutral-950 rounded-[2rem] relative overflow-hidden shadow-2xl">
+        <div v-motion-fade-visible-once class="border border-neutral-800 p-8 sm:p-12 bg-neutral-950 rounded-[2rem] relative overflow-hidden shadow-2xl">
           <div class="absolute top-0 right-0 transform translate-x-8 -translate-y-2 text-[10rem] font-black text-neutral-900/40 uppercase pointer-events-none select-none">VIP</div>
           <div class="relative z-10 max-w-xl">
             <span class="text-xs font-bold tracking-widest text-neutral-400 block mb-2">★ JOIN THE CLUB: UNLIMITED VIP MEMBERSHIP</span>
@@ -127,12 +139,12 @@
     <!-- BOOKING WIZARD SECTION -->
     <section id="booking-wizard" class="py-24 bg-neutral-50/50 border-b border-neutral-200/60">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="max-w-2xl mx-auto text-center mb-16">
+        <div v-motion-fade-visible-once class="max-w-2xl mx-auto text-center mb-16">
           <span class="text-xs font-bold tracking-widest uppercase text-neutral-400 block mb-2">Scheduling Portal</span>
           <h2 class="text-3xl font-black tracking-tight uppercase">Reserve An Appointment Slot</h2>
         </div>
 
-        <form @submit.prevent="submitGuestBooking" class="bg-white border border-neutral-200/60 p-6 sm:p-10 rounded-[2rem] shadow-sm max-w-5xl mx-auto">
+        <form v-motion-fade-visible-once @submit.prevent="submitGuestBooking" class="bg-white border border-neutral-200/60 p-6 sm:p-10 rounded-[2rem] shadow-sm max-w-5xl mx-auto">
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <!-- Left Form Controls -->
             <div class="lg:col-span-7 space-y-8">
@@ -148,26 +160,58 @@
               <!-- 1. Service Selection -->
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">1. Choose a service</label>
-                <select v-model="bookingForm.serviceId" required class="w-full bg-white border border-neutral-200 p-3.5 rounded-full text-xs font-semibold text-left focus:outline-none focus:border-dark transition-all px-5 shadow-sm">
-                  <option value="" disabled>Choose a service package...</option>
-                  <option v-for="s in services" :key="s.service_id || s.name" :value="s.service_id || s.name">
-                    {{ s.name || s.service_name }} — ₱{{ s.price || s.service_price }}
-                  </option>
-                </select>
+                <ServiceSelector 
+                  v-model="bookingForm.serviceId" 
+                  :services="services" 
+                  @change="onServiceChange" 
+                />
               </div>
 
               <!-- 2. Date & Time Selection -->
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">2. Choose a date & time</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-4">
                   <div>
-                    <input v-model="bookingForm.date" type="date" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-dark focus:bg-white transition-all px-4" />
+                    <input 
+                      v-model="bookingForm.date" 
+                      type="date" 
+                      :min="todayStr" 
+                      required 
+                      @change="onDateChange"
+                      class="w-full bg-neutral-50 border border-neutral-200 p-4 rounded-full text-xs font-semibold focus:outline-none focus:ring-0 focus:border-neutral-300 focus:bg-white transition-all px-6 outline-none shadow-sm cursor-pointer" 
+                    />
                   </div>
+
+                  <!-- Scrollable Dynamic Time Slot Blocks -->
                   <div>
-                    <select v-model="bookingForm.timeSlot" required class="w-full bg-white text-dark border border-neutral-200 p-3.5 rounded-full text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-dark transition-all shadow-sm">
-                      <option value="" disabled>Choose a time...</option>
-                      <option v-for="slot in timeSlots" :key="slot" :value="slot">{{ slot }}</option>
-                    </select>
+                    <div v-if="!bookingForm.serviceId" class="text-xs text-neutral-400 font-medium italic p-4 text-center bg-neutral-50 rounded-2xl border border-neutral-200">
+                      Please choose a service first to view available time slots.
+                    </div>
+                    <div v-else-if="!bookingForm.date" class="text-xs text-neutral-400 font-medium italic p-4 text-center bg-neutral-50 rounded-2xl border border-neutral-200">
+                      Please select a date to view available time slots.
+                    </div>
+                    <div v-else-if="loadingSlots" class="text-xs text-neutral-500 font-semibold p-4 text-center bg-neutral-50 rounded-2xl border border-neutral-200 animate-pulse">
+                      Checking studio bay availability...
+                    </div>
+                    <div v-else-if="availableTimeSlots.length === 0" class="text-xs text-red-500 font-semibold p-4 text-center bg-red-50 rounded-2xl border border-red-200">
+                      No available slots for this date & service duration. Please select another date.
+                    </div>
+                    <div v-else class="max-h-56 overflow-y-auto rounded-[1.5rem] bg-neutral-50 p-3 border border-neutral-200 shadow-inner grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        v-for="slot in availableTimeSlots"
+                        :key="slot.timeSlotValue"
+                        type="button"
+                        @click="bookingForm.timeSlot = slot.timeSlotValue"
+                        :class="[
+                          'p-3.5 rounded-full text-xs font-bold transition-all text-center border focus:outline-none focus:ring-0',
+                          bookingForm.timeSlot === slot.timeSlotValue
+                            ? 'bg-dark text-white border-dark shadow-md scale-[1.02]'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-dark hover:bg-neutral-100'
+                        ]"
+                      >
+                        {{ slot.label }}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -203,7 +247,7 @@
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-neutral-500 font-medium">Duration:</span>
-                    <span class="font-bold text-dark">60 Mins</span>
+                    <span class="font-bold text-dark">{{ selectedServiceDurationMinutes }} Mins</span>
                   </div>
                   <div class="border-t border-dashed border-neutral-300 my-4 pt-4 flex justify-between items-center text-sm font-bold">
                     <span class="text-neutral-800">Total Invoiced:</span>
@@ -251,16 +295,23 @@
       </div>
     </footer>
 
-    <!-- Vue Modals -->
+    <!-- Vue Modals with fade transitions -->
     <GlobalErrorModal ref="errorModal" />
-    <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />
-    <RegisterSubModal v-if="showRegisterModal" @close="showRegisterModal = false" />
-    <FeedbackModal v-if="showFeedbackModal" @close="showFeedbackModal = false" />
+    <transition name="fade-scale">
+      <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />
+    </transition>
+    <transition name="fade-scale">
+      <RegisterSubModal v-if="showRegisterModal" @close="showRegisterModal = false" />
+    </transition>
+    <transition name="fade-scale">
+      <FeedbackModal v-if="showFeedbackModal" @close="showFeedbackModal = false" />
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import ServiceSelector from '@/components/ServiceSelector.vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 import LoginModal from '@/components/LoginModal.vue';
 import RegisterSubModal from '@/components/RegisterSubModal.vue';
@@ -282,29 +333,174 @@ const timeSlots = ref([
   '09:00 AM', '10:00 AM', '11:00 AM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM'
 ]);
 
+const bookedSlots = ref([]);
+const loadingSlots = ref(false);
+const isServiceDropdownOpen = ref(false);
+
+const selectedServiceObj = computed(() => {
+  if (!bookingForm.value.serviceId) return null;
+  return services.value.find(s => String(s.service_id || s.name) === String(bookingForm.value.serviceId)) || null;
+});
+
+const selectServiceCustom = (service) => {
+  bookingForm.value.serviceId = service.service_id || service.name;
+  isServiceDropdownOpen.value = false;
+  onServiceChange();
+};
+
 const bookingForm = ref({
   name: '',
   phone: '',
   email: '',
-  serviceId: 1,
+  serviceId: '',
   date: '',
   timeSlot: ''
 });
 
 const bookingLoading = ref(false);
 
+const todayStr = computed(() => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+});
+
+const currentMinutesToday = computed(() => {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+});
+
+const selectedServiceDurationMinutes = computed(() => {
+  if (!bookingForm.value.serviceId) return 60;
+  const match = services.value.find(s => String(s.service_id || s.name) === String(bookingForm.value.serviceId));
+  if (!match) return 60;
+  const durStr = String(match.duration || match.service_duration || '60');
+  const parsed = durStr.match(/\d+/);
+  return parsed ? parseInt(parsed[0], 10) : 60;
+});
+
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3] ? match[3].toUpperCase() : null;
+
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+const formatMinutesTo12H = (mins) => {
+  let hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  const period = hours >= 12 ? 'PM' : 'AM';
+  if (hours > 12) hours -= 12;
+  if (hours === 0) hours = 12;
+  const hStr = hours < 10 ? '0' + hours : String(hours);
+  const mStr = minutes < 10 ? '0' + minutes : String(minutes);
+  return `${hStr}:${mStr} ${period}`;
+};
+
+const fetchBookedSlots = async (date) => {
+  if (!date) return;
+  loadingSlots.value = true;
+  try {
+    const apiBase = window.API_BASE_URL || '/api/v1';
+    const res = await fetch(`${apiBase}/bookings/availability?date=${date}`);
+    if (res.ok) {
+      const result = await res.json();
+      bookedSlots.value = result.data?.booked_slots || [];
+    }
+  } catch (err) {
+    console.warn("Could not fetch booked slots:", err);
+  } finally {
+    loadingSlots.value = false;
+  }
+};
+
+const onDateChange = () => {
+  bookingForm.value.timeSlot = '';
+  if (bookingForm.value.date) {
+    fetchBookedSlots(bookingForm.value.date);
+  }
+};
+
+const onServiceChange = () => {
+  bookingForm.value.timeSlot = '';
+};
+
+const availableTimeSlots = computed(() => {
+  if (!bookingForm.value.serviceId || !bookingForm.value.date) return [];
+
+  const duration = selectedServiceDurationMinutes.value;
+  const dayStart = 9 * 60;  // 09:00 AM
+  const dayEnd = 17 * 60;   // 05:00 PM
+  const step = 30;          // 30 min step
+
+  const slots = [];
+  const isToday = bookingForm.value.date === todayStr.value;
+  const nowMins = currentMinutesToday.value;
+
+  for (let start = dayStart; start + duration <= dayEnd; start += step) {
+    const end = start + duration;
+    const label = `${formatMinutesTo12H(start)} - ${formatMinutesTo12H(end)}`;
+
+    // 1. Filter out past times if booking for today
+    if (isToday && start <= nowMins) {
+      continue;
+    }
+
+    // 2. Filter out overlap with existing booked slots
+    let isOverlap = false;
+    for (const booked of bookedSlots.value) {
+      let bStart = 0;
+      let bEnd = 0;
+      if (booked.time_slot && booked.time_slot.includes('-')) {
+        const parts = booked.time_slot.split('-');
+        bStart = parseTimeToMinutes(parts[0].trim());
+        bEnd = parseTimeToMinutes(parts[1].trim());
+      } else if (booked.time_slot) {
+        bStart = parseTimeToMinutes(booked.time_slot);
+        bEnd = bStart + 60;
+      }
+
+      if (Math.max(start, bStart) < Math.min(end, bEnd)) {
+        isOverlap = true;
+        break;
+      }
+    }
+
+    if (!isOverlap) {
+      slots.push({
+        label,
+        timeSlotValue: label
+      });
+    }
+  }
+
+  return slots;
+});
+
 const selectedServiceName = computed(() => {
-  const match = services.value.find(s => (s.service_id || s.name) === bookingForm.value.serviceId);
-  return match ? (match.name || match.service_name) : 'Standard Car Wash';
+  if (!bookingForm.value.serviceId) return 'Please Select a Service';
+  const match = services.value.find(s => String(s.service_id || s.name) === String(bookingForm.value.serviceId));
+  return match ? (match.name || match.service_name) : 'Please Select a Service';
 });
 
 const selectedPrice = computed(() => {
-  const match = services.value.find(s => (s.service_id || s.name) === bookingForm.value.serviceId);
-  return match ? (match.price || match.service_price) : 250;
+  if (!bookingForm.value.serviceId) return 0;
+  const match = services.value.find(s => String(s.service_id || s.name) === String(bookingForm.value.serviceId));
+  return match ? (match.price || match.service_price) : 0;
 });
 
 const selectService = (service) => {
   bookingForm.value.serviceId = service.service_id || service.name;
+  onServiceChange();
 };
 
 const fetchServices = async () => {
@@ -371,35 +567,19 @@ const submitGuestBooking = async () => {
 
     const checkoutData = await checkoutRes.json().catch(() => ({}));
 
-    if (checkoutData.checkout_url) {
-      if (checkoutData.sandbox) {
-        // Automatically verify in Sandbox test mode
-        await fetch(`${apiBase}/payments/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ booking_id: bookingId, payment_method: 'PayMongo GCash (Sandbox)' })
-        });
-        if (errorModal.value) {
-          await errorModal.value.show(`Payment verified via PayMongo Sandbox! Booking ID: MTG-${bookingId} is confirmed.`, true);
-        }
-      } else {
-        // Redirect to PayMongo Hosted Checkout Page (GCash / Maya / Card)
-        window.location.href = checkoutData.checkout_url;
-        return;
-      }
+    if (checkoutData && checkoutData.checkout_url) {
+      // Redirect to official PayMongo Hosted Checkout Page (GCash / Maya / Card)
+      window.location.href = checkoutData.checkout_url;
+      return;
     } else {
       if (errorModal.value) {
-        await errorModal.value.show(`Booking request submitted successfully! Booking ID: MTG-${bookingId}`, true);
+        await errorModal.value.show(checkoutData.message || 'Please set your PAYMONGO_SECRET_KEY (sk_test_...) in server/.env to launch the official PayMongo Hosted Checkout Page.');
       }
     }
-
-    bookingForm.value = { name: '', phone: '', email: '', serviceId: 1, date: '', timeSlot: '' };
   } catch (err) {
-    const fallbackId = Math.floor(100000 + Math.random() * 900000);
     if (errorModal.value) {
-      await errorModal.value.show(`Booking request submitted successfully! Booking ID: MTG-${fallbackId}`, true);
+      await errorModal.value.show(err.message || 'Failed to initialize PayMongo Hosted Checkout session.');
     }
-    bookingForm.value = { name: '', phone: '', email: '', serviceId: 1, date: '', timeSlot: '' };
   } finally {
     bookingLoading.value = false;
   }
@@ -409,23 +589,55 @@ const checkPaymentRedirect = async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const paymentStatus = urlParams.get('payment');
   const bookingId = urlParams.get('booking_id');
+  const regToken = urlParams.get('reg_token');
 
-  if (paymentStatus === 'success' && bookingId) {
-    try {
-      const apiBase = window.API_BASE_URL || '/api/v1';
-      await fetch(`${apiBase}/payments/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: parseInt(bookingId, 10), payment_method: 'PayMongo (Verified)' })
-      });
-
-      if (errorModal.value) {
-        await errorModal.value.show(`Payment successful! Your booking MTG-${bookingId} is now CONFIRMED.`, true);
+  if (paymentStatus === 'success') {
+    if (regToken) {
+      try {
+        const apiBase = window.API_BASE_URL || '/api/v1';
+        const res = await fetch(`${apiBase}/payments/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reg_token: regToken, payment_method: 'PayMongo (Verified Checkout)' })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          if (data.token) localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('subscriber_session_active', 'true');
+          if (data.user?.full_name) localStorage.setItem('subscriber_name', data.user.full_name);
+          if (errorModal.value) {
+            await errorModal.value.show('Payment Successful! Account registered & VIP Membership activated.', true);
+          }
+        } else {
+          if (errorModal.value) {
+            await errorModal.value.show(data.message || 'Registration payment verification failed.');
+          }
+        }
+      } catch (e) {
+        console.error('Registration payment verification failed:', e);
       }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } catch (e) {
-      console.error('Payment verification failed:', e);
+    } else if (bookingId) {
+      try {
+        const apiBase = window.API_BASE_URL || '/api/v1';
+        await fetch(`${apiBase}/payments/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: parseInt(bookingId, 10), payment_method: 'PayMongo (Verified)' })
+        });
+
+        if (errorModal.value) {
+          await errorModal.value.show(`Payment successful! Your booking MTG-${bookingId} is now CONFIRMED.`, true);
+        }
+      } catch (e) {
+        console.error('Booking payment verification failed:', e);
+      }
     }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (paymentStatus === 'cancel') {
+    if (errorModal.value) {
+      await errorModal.value.show('Payment was cancelled or failed. Your account was not registered and no data was saved.');
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 };
 
