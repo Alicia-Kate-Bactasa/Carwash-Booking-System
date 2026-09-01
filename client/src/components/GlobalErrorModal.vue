@@ -44,8 +44,37 @@ const message = ref('');
 const isInfo = ref(false);
 let resolvePromise = null;
 
+const sanitizeErrorMessage = (msg, infoMode) => {
+  if (!msg) return 'An unexpected system error occurred. Please try again.';
+  const str = String(msg);
+  
+  // Log full raw error trace to browser developer console for debugging
+  if (!infoMode) {
+    console.error('[Montage Studio System Error]:', msg);
+  }
+  
+  // Intercept and sanitize technical, Prisma, and database tracebacks
+  if (
+    str.includes('prisma.') ||
+    str.includes('PrismaClient') ||
+    str.includes('findUnique') ||
+    str.includes('database server') ||
+    str.includes('DATABASE_URL') ||
+    str.includes('ep-curly-unit') ||
+    str.includes('.aws.neon.tech') ||
+    str.includes('/data/users/') ||
+    str.includes('Invocation in') ||
+    str.includes('ConnectorError') ||
+    str.includes('500')
+  ) {
+    return 'Database connection is currently unavailable. Please try again in a few moments or contact support.';
+  }
+  
+  return str;
+};
+
 const show = (msg, infoMode = false) => {
-  message.value = msg;
+  message.value = sanitizeErrorMessage(msg, infoMode);
   isInfo.value = infoMode;
   isOpen.value = true;
   return new Promise((resolve) => {

@@ -207,6 +207,27 @@ const registerForm = ref({
   password: ''
 });
 
+const cleanErrorMessage = (err, fallback) => {
+  const str = String(err?.message || err || '');
+  if (!str) return fallback;
+  console.error('[Login Error Trace]:', err);
+  if (
+    str.includes('prisma.') ||
+    str.includes('PrismaClient') ||
+    str.includes('findUnique') ||
+    str.includes('database server') ||
+    str.includes('DATABASE_URL') ||
+    str.includes('ep-curly-unit') ||
+    str.includes('.aws.neon.tech') ||
+    str.includes('/data/users/') ||
+    str.includes('Invocation in') ||
+    str.includes('ConnectorError')
+  ) {
+    return 'Database connection is currently unavailable. Please try again in a few moments.';
+  }
+  return str;
+};
+
 const handleLogin = async () => {
   loading.value = true;
   errorMsg.value = '';
@@ -237,7 +258,7 @@ const handleLogin = async () => {
       router.push('/dashboard');
     }
   } catch (err) {
-    errorMsg.value = err.message || 'Invalid email address or password.';
+    errorMsg.value = cleanErrorMessage(err, 'Invalid email address or password.');
   } finally {
     loading.value = false;
   }
@@ -274,10 +295,10 @@ const handleRegister = async () => {
       window.location.href = result.checkout_url;
       return;
     } else {
-      errorMsg.value = result.message || 'PayMongo Checkout initialization failed. Please try again.';
+      errorMsg.value = cleanErrorMessage(result.message, 'PayMongo Checkout initialization failed. Please try again.');
     }
   } catch (err) {
-    errorMsg.value = err.message || 'Registration failed. Please try again.';
+    errorMsg.value = cleanErrorMessage(err, 'Registration failed. Please try again.');
   } finally {
     loading.value = false;
   }

@@ -257,12 +257,19 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login Error:', error);
-    const dbErr = error.message && (error.message.includes('Authentication failed') || error.message.includes('Prisma'));
+    const isDbError = error.message && (
+      error.message.includes('Authentication failed') ||
+      error.message.includes('Prisma') ||
+      error.message.includes('database server') ||
+      error.message.includes('Can\'t reach') ||
+      error.message.includes('ConnectorError') ||
+      error.message.includes('ep-curly-unit')
+    );
     return res.status(500).json({
       status: 'error',
-      message: dbErr 
-        ? 'Database connection error. Please update DATABASE_URL in server/.env with your valid Neon PostgreSQL connection string.' 
-        : (error.message || 'Failed to log in. Please try again.')
+      message: isDbError 
+        ? 'Database connection is currently unavailable. Please try again in a few moments.' 
+        : 'Failed to log in. Please try again.'
     });
   }
 });
@@ -423,7 +430,7 @@ router.post('/reset-password', async (req, res) => {
     });
 
     // Delete used security action
-    await prisma.userSecurityAction.delete({ where: { action_id: action.action_id } }).catch(() => {});
+    await prisma.userSecurityAction.deleteMany({ where: { identifier: email, action_type: 'password_reset' } }).catch(() => {});
 
     return res.status(200).json({
       status: 'success',
