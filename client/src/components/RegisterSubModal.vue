@@ -3,9 +3,10 @@
   Collects new member registration details and redirects to PayMongo Hosted Checkout for ₱1,500 monthly VIP membership.
 -->
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm">
-    <div class="bg-white p-8 w-full max-w-md relative rounded-[2.5rem] shadow-2xl mx-4 border border-neutral-200 animate-modal-scale-in">
-      <button @click="$emit('close')" class="absolute top-5 right-5 text-neutral-400 hover:text-dark text-xs font-bold focus:outline-none">✕</button>
+  <Transition name="fade-scale" appear>
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm p-4 overflow-y-auto" @click.self="$emit('close')">
+      <div class="bg-white p-8 w-full max-w-md relative rounded-[2.5rem] shadow-2xl mx-4 border border-neutral-200 transform transition-all duration-300">
+        <button @click="$emit('close')" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-500 hover:text-dark text-xs font-bold flex items-center justify-center focus:outline-none transition-colors">✕</button>
 
       <div class="text-center mb-6">
         <h3 class="text-xl font-bold uppercase tracking-tight text-dark">VIP Membership Roster</h3>
@@ -57,6 +58,7 @@
       </form>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup>
