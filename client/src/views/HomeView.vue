@@ -613,6 +613,7 @@ const checkPaymentRedirect = async () => {
           if (data.token) localStorage.setItem('auth_token', data.token);
           localStorage.setItem('subscriber_session_active', 'true');
           if (data.user?.full_name) localStorage.setItem('subscriber_name', data.user.full_name);
+          if (data.user?.email) localStorage.setItem('subscriber_email', data.user.email.toLowerCase());
           if (errorModal.value) {
             await errorModal.value.show('Payment Successful! Account registered & VIP Membership activated.', true);
           }

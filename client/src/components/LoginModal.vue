@@ -250,6 +250,7 @@ const handleLogin = async () => {
 
     localStorage.setItem('subscriber_session_active', 'true');
     localStorage.setItem('subscriber_name', result.user?.full_name || loginForm.value.email.split('@')[0]);
+    localStorage.setItem('subscriber_email', loginForm.value.email.trim().toLowerCase());
     if (result.token) localStorage.setItem('auth_token', result.token);
     emit('close');
     if (result.user?.role === 'Admin' || loginForm.value.email.toLowerCase().includes('admin')) {

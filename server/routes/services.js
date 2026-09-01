@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 /**
  * GET /api/v1/services
@@ -72,7 +73,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/v1/services
  * Create a new detailing service package (Admin)
  */
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { service_name, service_price, service_category, service_duration, service_description, is_active } = req.body;
 
@@ -113,7 +114,7 @@ router.post('/', async (req, res) => {
  * PUT /api/v1/services/:id
  * Update an existing service (Admin)
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     if (isNaN(serviceId)) {
@@ -154,7 +155,7 @@ router.put('/:id', async (req, res) => {
  * PATCH /api/v1/services/:id/toggle
  * Toggle service activation status (Admin)
  */
-router.patch('/:id/toggle', async (req, res) => {
+router.patch('/:id/toggle', requireAuth, requireAdmin, async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     if (isNaN(serviceId)) {
@@ -195,7 +196,7 @@ router.patch('/:id/toggle', async (req, res) => {
  * DELETE /api/v1/services/:id
  * Soft delete / deactivate service (Admin)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     if (isNaN(serviceId)) {

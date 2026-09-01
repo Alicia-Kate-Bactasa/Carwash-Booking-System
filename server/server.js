@@ -8,6 +8,8 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 // Robustly load environment variables from server/.env or root .env
 const envPaths = [
@@ -37,9 +39,33 @@ const PORT = process.env.PORT || 5001;
 
 // Security configuration and body parsing middleware
 app.disable('x-powered-by');
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(helmet({ contentSecurityPolicy: false }));
+
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.ALLOWED_ORIGIN || '']
+  : ['http://localhost:5173', 'http://localhost:5001'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Rate limiter for sensitive auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { status: 'error', message: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Health check endpoint for system monitoring
 app.get('/api/v1/health', (req, res) => {
@@ -51,8 +77,8 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 // API v1 router mounts
-app.use('/api/v1/auth', authRouter);
-app.use('/api/auth', authRouter);
+app.use('/api/v1/auth', authLimiter, authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/v1/services', servicesRouter);
 app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
@@ -79,9 +105,10 @@ app.get('*', (req, res, next) => {
 
 // 404 handler for unmatched API routes
 app.use((req, res) => {
+  const safeUrl = encodeURIComponent(req.originalUrl || '');
   return res.status(404).json({
     status: 'error',
-    message: `Endpoint ${req.originalUrl} not found.`
+    message: `Endpoint not found.`
   });
 });
 

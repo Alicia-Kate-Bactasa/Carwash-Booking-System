@@ -7,6 +7,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+
+// Protect ALL admin routes with authentication + admin role check
+router.use(requireAuth, requireAdmin);
 
 /**
  * GET /api/v1/admin/bookings
@@ -81,6 +85,14 @@ router.put('/bookings/:id/status', async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id, 10);
     const { booking_status, reason } = req.body;
+
+    const VALID_STATUSES = ['Pending', 'Pending_Verification', 'Confirmed', 'Completed', 'Cancelled', 'No_Show', 'Paid', 'Scheduled'];
+    if (!booking_status || !VALID_STATUSES.includes(booking_status)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `booking_status must be one of: ${VALID_STATUSES.join(', ')}`
+      });
+    }
 
     const updated = await prisma.booking.update({
       where: { booking_id: bookingId },

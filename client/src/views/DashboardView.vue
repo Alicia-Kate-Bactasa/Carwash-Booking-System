@@ -812,6 +812,7 @@ const logout = async () => {
   localStorage.removeItem('subscriber_session_active');
   localStorage.removeItem('subscriber_name');
   localStorage.removeItem('subscriber_plan_status');
+  localStorage.removeItem('subscriber_email');
   localStorage.removeItem('auth_token');
   router.push('/');
 };

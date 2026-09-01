@@ -29,11 +29,22 @@ const createBookingSchema = z.object({
 
 /**
  * GET /api/v1/user/bookings
- * Get current user bookings list
+ * Get current authenticated user's bookings list
  */
-router.get('/user/bookings', async (req, res) => {
+router.get('/user/bookings', requireAuth, async (req, res) => {
   try {
+    const where = {};
+
+    const dbUser = await prisma.user.findUnique({
+      where: { email: req.user.email }
+    }).catch(() => null);
+
+    if (req.user.role !== 'Admin' && dbUser) {
+      where.user_id = dbUser.user_id;
+    }
+
     const bookings = await prisma.booking.findMany({
+      where,
       include: {
         service: true,
         customer: true
@@ -52,7 +63,7 @@ router.get('/user/bookings', async (req, res) => {
  * POST /api/v1/bookings/member
  * Create member VIP booking (VIP FREE - 0 Pesos Invoice)
  */
-router.post('/member', async (req, res) => {
+router.post('/member', requireAuth, async (req, res) => {
   try {
     const { service_id, scheduled_date, time_slot } = req.body;
     if (!service_id || !scheduled_date || !time_slot) {
@@ -60,6 +71,20 @@ router.post('/member', async (req, res) => {
     }
 
     const serviceId = parseInt(service_id, 10);
+
+    // Get the authenticated user
+    const dbUser = await prisma.user.findUnique({
+      where: { email: req.user.email }
+    });
+    if (!dbUser) {
+      return res.status(404).json({ status: 'error', message: 'User account not found.' });
+    }
+
+    // Verify user has an active subscription
+    const activeSub = await prisma.subscription.findFirst({
+      where: { user_id: dbUser.user_id, plan_status: 'Active' }
+    });
+
     const service = await prisma.service.findUnique({ where: { service_id: serviceId } });
     if (!service || !service.is_active) {
       return res.status(404).json({ status: 'error', message: 'Requested service package is inactive or not found.' });
@@ -81,6 +106,7 @@ router.post('/member', async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const newBooking = await tx.booking.create({
         data: {
+          user_id: dbUser.user_id,
           service_id: serviceId,
           scheduled_date: new Date(scheduled_date),
           time_slot,
@@ -93,6 +119,7 @@ router.post('/member', async (req, res) => {
       const newInvoice = await tx.invoice.create({
         data: {
           booking_id: newBooking.booking_id,
+          subscription_id: activeSub?.subscription_id || null,
           total_amount: 0.00,
           invoice_type: 'Single_Detailing',
           invoice_status: 'Paid'
@@ -361,6 +388,16 @@ router.put('/:id/reschedule', requireAuth, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Booking not found.' });
     }
 
+    // Authorization: Admins can reschedule any booking; users can only reschedule their own
+    if (req.user.role !== 'Admin') {
+      const dbUser = await prisma.user.findUnique({ where: { email: req.user.email } }).catch(() => null);
+      const isOwner = booking.user_id === (dbUser?.user_id ?? null) ||
+        booking.customer?.email === req.user.email;
+      if (!isOwner) {
+        return res.status(403).json({ status: 'error', message: 'You do not have permission to reschedule this booking.' });
+      }
+    }
+
     // Check slot collision
     const collision = await prisma.booking.findFirst({
       where: {
@@ -438,6 +475,16 @@ router.put('/:id/cancel', requireAuth, async (req, res) => {
     });
     if (!booking) {
       return res.status(404).json({ status: 'error', message: 'Booking not found.' });
+    }
+
+    // Authorization: Admins can cancel any booking; users can only cancel their own
+    if (req.user.role !== 'Admin') {
+      const dbUser = await prisma.user.findUnique({ where: { email: req.user.email } }).catch(() => null);
+      const isOwner = booking.user_id === (dbUser?.user_id ?? null) ||
+        booking.customer?.email === req.user.email;
+      if (!isOwner) {
+        return res.status(403).json({ status: 'error', message: 'You do not have permission to cancel this booking.' });
+      }
     }
 
     const cancelledBooking = await prisma.booking.update({

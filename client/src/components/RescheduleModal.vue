@@ -70,9 +70,13 @@ const handleReschedule = async () => {
   errorMsg.value = '';
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('auth_token');
     const res = await fetch(`${apiBase}/bookings/${props.rawBookingId}/reschedule`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({
         scheduled_date: newDate.value,
         time_slot: newTime.value
@@ -83,10 +87,11 @@ const handleReschedule = async () => {
       const errRes = await res.json().catch(() => ({}));
       throw new Error(errRes.message || 'Failed to reschedule booking.');
     }
-
+    errorMsg.value = '';
     emit('updated');
     emit('close');
   } catch (err) {
+    errorMsg.value = err.message || 'Failed to reschedule booking.';
     emit('updated');
     emit('close');
   } finally {

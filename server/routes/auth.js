@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const prisma = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 
@@ -350,8 +351,8 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Generate 6-digit numeric OTP code
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate cryptographically secure 6-digit numeric OTP code
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
 
     // Record security action token in database

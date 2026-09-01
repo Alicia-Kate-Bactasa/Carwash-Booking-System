@@ -6,8 +6,29 @@
 
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
+
+/**
+ * Extracts and verifies the email from the Bearer token (uses the SAME secret as auth).
+ */
+const getEmailFromAuth = (req) => {
+  if (req.user?.email) return req.user.email.trim().toLowerCase();
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const tokenStr = authHeader.split(' ')[1];
+      if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined') {
+        const decoded = jwt.verify(tokenStr, JWT_SECRET);
+        if (decoded && decoded.email) return decoded.email.trim().toLowerCase();
+      }
+    } catch (e) {}
+  }
+  return null;
+};
 
 /**
  * GET /api/v1/subscriptions
@@ -47,20 +68,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
  */
 router.get('/me', async (req, res) => {
   try {
-    let email = req.user?.email || req.query?.email;
-    if (!email) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const tokenStr = authHeader.split(' ')[1];
-          if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined') {
-            const jwt = require('jsonwebtoken');
-            const decoded = jwt.verify(tokenStr, process.env.JWT_SECRET || 'montage-auto-studio-super-secret-jwt-key-2026');
-            if (decoded && decoded.email) email = decoded.email.trim().toLowerCase();
-          }
-        } catch (e) {}
-      }
-    }
+    const email = getEmailFromAuth(req);
 
     let user = null;
     if (email && email.length > 3) {
@@ -76,18 +84,11 @@ router.get('/me', async (req, res) => {
       }).catch(() => null);
     }
 
-    if (!subscription) {
-      subscription = await prisma.subscription.findFirst({
-        include: { invoices: { include: { payments: true } } },
-        orderBy: { subscription_id: 'desc' }
-      }).catch(() => null);
-    }
-
     return res.status(200).json({
       status: 'success',
       data: {
-        user: user || { email: email || 'subscriber@montage.ph', username: 'VIP Member' },
-        subscription: subscription || null
+        user: user || { email: email || null, username: 'VIP Member' },
+        subscription
       }
     });
   } catch (error) {
@@ -169,21 +170,8 @@ router.post('/renew', requireAuth, async (req, res) => {
  */
 router.post('/cancel', async (req, res) => {
   try {
-    let email = (req.body?.email || req.user?.email || '').trim().toLowerCase();
-
-    if (!email) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const tokenStr = authHeader.split(' ')[1];
-          if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined') {
-            const jwt = require('jsonwebtoken');
-            const decoded = jwt.verify(tokenStr, process.env.JWT_SECRET || 'montage-auto-studio-super-secret-jwt-key-2026');
-            if (decoded && decoded.email) email = decoded.email.trim().toLowerCase();
-          }
-        } catch (e) {}
-      }
-    }
+    const requestedEmail = (req.body?.email || '').trim().toLowerCase();
+    const email = requestedEmail || getEmailFromAuth(req);
 
     let user = null;
     if (email && email.length > 3) {
@@ -198,15 +186,12 @@ router.post('/cancel', async (req, res) => {
       }).catch(() => null);
     }
 
-    if (!sub) {
-      sub = await prisma.subscription.findFirst({
-        orderBy: { subscription_id: 'desc' }
-      }).catch(() => null);
+    if (sub && sub.subscription_id) {
+      await prisma.subscription.update({
+        where: { subscription_id: sub.subscription_id },
+        data: { plan_status: 'Cancelled' }
+      }).catch(() => {});
     }
-
-    await prisma.subscription.updateMany({
-      data: { plan_status: 'Cancelled' }
-    }).catch(() => {});
 
     const recipientEmail = email || user?.email;
     if (recipientEmail && recipientEmail.includes('@')) {
@@ -225,9 +210,9 @@ router.post('/cancel', async (req, res) => {
     });
   } catch (error) {
     console.error('Error cancelling subscription:', error);
-    return res.status(200).json({
-      status: 'success',
-      message: 'Subscription plan set to Cancelled.'
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to cancel subscription.'
     });
   }
 });
@@ -238,26 +223,17 @@ router.post('/cancel', async (req, res) => {
  */
 router.post('/reactivate', async (req, res) => {
   try {
-    let email = (req.body?.email || req.user?.email || '').trim().toLowerCase();
-
-    if (!email) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const tokenStr = authHeader.split(' ')[1];
-          if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined') {
-            const jwt = require('jsonwebtoken');
-            const decoded = jwt.verify(tokenStr, process.env.JWT_SECRET || 'montage-auto-studio-super-secret-jwt-key-2026');
-            if (decoded && decoded.email) email = decoded.email.trim().toLowerCase();
-          }
-        } catch (e) {}
-      }
-    }
+    const requestedEmail = (req.body?.email || '').trim().toLowerCase();
+    const email = requestedEmail || getEmailFromAuth(req);
 
     let user = null;
     if (email && email.length > 3) {
       user = await prisma.user.findUnique({ where: { email } }).catch(() => null);
     }
+
+    const today = new Date();
+    const nextMonth = new Date();
+    nextMonth.setMonth(today.getMonth() + 1);
 
     let sub = null;
     if (user) {
@@ -267,21 +243,12 @@ router.post('/reactivate', async (req, res) => {
       }).catch(() => null);
     }
 
-    if (!sub) {
-      sub = await prisma.subscription.findFirst({
-        orderBy: { subscription_id: 'desc' }
-      }).catch(() => null);
-    }
-
-    const today = new Date();
-    const nextMonth = new Date();
-    nextMonth.setMonth(today.getMonth() + 1);
-
-    await prisma.subscription.updateMany({
-      data: { plan_status: 'Active', last_billing_date: today, next_billing_date: nextMonth }
-    }).catch(() => {});
-
-    if (!sub && user) {
+    if (sub && sub.subscription_id) {
+      sub = await prisma.subscription.update({
+        where: { subscription_id: sub.subscription_id },
+        data: { plan_status: 'Active', last_billing_date: today, next_billing_date: nextMonth }
+      }).catch(() => sub);
+    } else if (user) {
       sub = await prisma.subscription.create({
         data: {
           user_id: user.user_id,
@@ -311,9 +278,9 @@ router.post('/reactivate', async (req, res) => {
     });
   } catch (error) {
     console.error('Error reactivating subscription:', error);
-    return res.status(200).json({
-      status: 'success',
-      message: 'Subscription plan set to Active.'
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to reactivate subscription.'
     });
   }
 });

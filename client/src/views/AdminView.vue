@@ -606,14 +606,25 @@ const feedbackStats = computed(() => {
   };
 });
 
+const getAuthHeaders = (json = true) => {
+  const headers = json ? { 'Content-Type': 'application/json' } : {};
+  const token = localStorage.getItem('auth_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
+const extractList = (data) => {
+  return Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
+};
+
 const loadBookings = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/admin/bookings`);
+    const res = await fetch(`${apiBase}/admin/bookings`, { headers: getAuthHeaders(false) });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        appointments.value = data.map(app => {
+      const json = await res.json().catch(() => ({}));
+      const data = extractList(json);
+      appointments.value = data.map(app => {
           let type = 'cancelled';
           const statusStr = String(app.booking_status || '');
           if (['Pending Verification', 'Pending_Verification', 'Confirmed', 'Pending', 'Paid', 'Scheduled'].includes(statusStr)) {
@@ -632,8 +643,7 @@ const loadBookings = async () => {
             client: app.customer?.full_name || app.customers?.full_name || app.customer_name || 'Client',
             userType: app.user_id ? 'subscriber' : 'regular'
           };
-        });
-      }
+      });
     }
   } catch (err) {
     console.warn("Bookings fetch notice:", err);
@@ -643,10 +653,10 @@ const loadBookings = async () => {
 const loadInvoices = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/admin/invoices`);
+    const res = await fetch(`${apiBase}/admin/invoices`, { headers: getAuthHeaders(false) });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) invoices.value = data;
+      const json = await res.json().catch(() => ({}));
+      invoices.value = extractList(json);
     }
   } catch (err) {
     console.warn("Invoices fetch notice:", err);
@@ -656,11 +666,10 @@ const loadInvoices = async () => {
 const loadServices = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/services?include_inactive=true`);
+    const res = await fetch(`${apiBase}/services?include_inactive=true`, { headers: getAuthHeaders(false) });
     if (res.ok) {
-      const result = await res.json();
-      const items = Array.isArray(result) ? result : (result.data || []);
-      services.value = items;
+      const json = await res.json().catch(() => ({}));
+      services.value = extractList(json);
     }
   } catch (err) {
     console.warn("Services fetch notice:", err);
@@ -670,10 +679,10 @@ const loadServices = async () => {
 const loadSubscribers = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/admin/subscriptions`);
+    const res = await fetch(`${apiBase}/admin/subscriptions`, { headers: getAuthHeaders(false) });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) subscribers.value = data;
+      const json = await res.json().catch(() => ({}));
+      subscribers.value = extractList(json);
     }
   } catch (err) {
     console.warn("Subscribers fetch notice:", err);
@@ -683,10 +692,15 @@ const loadSubscribers = async () => {
 const loadFeedbacks = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/feedbacks`);
+    const res = await fetch(`${apiBase}/feedbacks`, { headers: getAuthHeaders(false) });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) feedbacks.value = data;
+      const json = await res.json().catch(() => ({}));
+      const data = extractList(json);
+      feedbacks.value = data.map(fb => ({
+        ...fb,
+        customer_name: fb.customer_name || fb.booking?.customer?.full_name || fb.booking?.user?.username || 'Valued Customer',
+        service_name: fb.service_name || fb.booking?.service?.service_name || 'Detailing Session'
+      }));
     }
   } catch (err) {
     console.warn("Feedbacks fetch notice:", err);
@@ -698,7 +712,7 @@ const updateBookingStatus = async (bookingId, newStatus) => {
     const apiBase = window.API_BASE_URL || '/api/v1';
     await fetch(`${apiBase}/admin/bookings/${bookingId}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ booking_status: newStatus })
     });
     await loadBookings();
@@ -712,7 +726,7 @@ const toggleServiceActivation = async (service) => {
     const apiBase = window.API_BASE_URL || '/api/v1';
     await fetch(`${apiBase}/services/${service.service_id}/toggle`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' }
+      headers: getAuthHeaders()
     });
     await loadServices();
   } catch (err) {
@@ -756,7 +770,7 @@ const saveService = async () => {
 
     const res = await fetch(endpoint, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         service_name: serviceForm.value.service_name,
         service_price: parseFloat(serviceForm.value.service_price),
