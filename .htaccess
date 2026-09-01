@@ -3,19 +3,12 @@
 
 DirectoryIndex client/dist/index.html index.html
 
-# Proxy /api requests to local Express Node server if mod_proxy is enabled
-<IfModule mod_proxy.c>
-    ProxyPass /api http://127.0.0.1:5001/api
-    ProxyPassReverse /api http://127.0.0.1:5001/api
-</IfModule>
-
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
 
-    # Do not rewrite backend API calls
-    RewriteCond %{REQUEST_URI} ^/api [NC]
-    RewriteRule ^ - [L]
+    # Proxy /api requests to local Express Node server on port 5001
+    RewriteRule ^api/(.*)$ http://127.0.0.1:5001/api/$1 [P,L]
 
     # If the requested file or directory exists in client/dist, serve it directly
     RewriteCond %{DOCUMENT_ROOT}/client/dist%{REQUEST_URI} -f [OR]
@@ -27,3 +20,4 @@ DirectoryIndex client/dist/index.html index.html
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ client/dist/index.html [L]
 </IfModule>
+
