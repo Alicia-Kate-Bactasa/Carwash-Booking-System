@@ -75,8 +75,23 @@ const handlePreRegistration = async (req, res) => {
     );
 
     // Request PayMongo Hosted Checkout Session for ₱1,500 VIP Membership
-    require('dotenv').config();
-    const paymongoKey = process.env.PAYMONGO_SECRET_KEY;
+    const path = require('path');
+    const fs = require('fs');
+    const dotenv = require('dotenv');
+    const envPaths = [
+      path.join(__dirname, '../.env'),
+      path.join(__dirname, '../../.env'),
+      path.join(process.cwd(), 'server/.env'),
+      path.join(process.cwd(), '.env')
+    ];
+    for (const envPath of envPaths) {
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath, override: true });
+      }
+    }
+
+    const rawKey = process.env.PAYMONGO_SECRET_KEY || '';
+    const paymongoKey = rawKey.trim();
     const baseReturnUrl = req.headers.referer || 'http://localhost:5173/';
     const cleanReturnUrl = baseReturnUrl.split('?')[0];
     const successUrl = `${cleanReturnUrl}?payment=success&reg_token=${regToken}`;

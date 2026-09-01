@@ -3,9 +3,24 @@
  * Initializes core security middleware, API route handlers, health check, global error handling, and HTTP listener.
  */
 
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+
+// Robustly load environment variables from server/.env or root .env
+const envPaths = [
+  path.join(__dirname, '.env'),
+  path.join(__dirname, '../.env'),
+  path.join(process.cwd(), 'server/.env'),
+  path.join(process.cwd(), '.env')
+];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+  }
+}
 
 // Route module imports
 const authRouter = require('./routes/auth');
@@ -47,8 +62,6 @@ app.use('/api/v1/feedback', feedbackRouter);
 app.use('/api/v1/feedbacks', feedbackRouter);
 
 // Serve compiled Vue frontend static assets
-const path = require('path');
-const fs = require('fs');
 const clientDistPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
 

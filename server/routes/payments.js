@@ -198,8 +198,23 @@ router.post('/paymongo/checkout', async (req, res) => {
     const { invoice_id, booking_id, subscription_id, amount, service_name, client_email, return_url } = req.body;
 
     const numericAmount = parseFloat(amount) || 250;
-    require('dotenv').config();
-    const paymongoKey = process.env.PAYMONGO_SECRET_KEY;
+    const path = require('path');
+    const fs = require('fs');
+    const dotenv = require('dotenv');
+    const envPaths = [
+      path.join(__dirname, '../.env'),
+      path.join(__dirname, '../../.env'),
+      path.join(process.cwd(), 'server/.env'),
+      path.join(process.cwd(), '.env')
+    ];
+    for (const envPath of envPaths) {
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath, override: true });
+      }
+    }
+
+    const rawKey = process.env.PAYMONGO_SECRET_KEY || '';
+    const paymongoKey = rawKey.trim();
     const itemDescription = service_name || 'Montage Auto Studio Detailing Service';
     const amountInCents = Math.round(numericAmount * 100);
 
