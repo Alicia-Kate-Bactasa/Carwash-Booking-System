@@ -1,14 +1,23 @@
 # Apache Configuration for Montage Auto Studio
-# Serves frontend files from the client/ folder while maintaining clean root URLs
+# Serves compiled production frontend files from client/dist/ with Vue Router history fallback support
 
-DirectoryIndex client/index.html index.html
+DirectoryIndex client/dist/index.html index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    
-    # Do not rewrite if request is already in client/ or server/
-    RewriteCond %{REQUEST_URI} !^/client/
-    
-    # Rewrite root requests to client directory
-    RewriteRule ^(.*)$ client/$1 [L]
+    RewriteBase /
+
+    # Do not rewrite backend API calls
+    RewriteCond %{REQUEST_URI} ^/api [NC]
+    RewriteRule ^ - [L]
+
+    # If the requested file or directory exists in client/dist, serve it directly
+    RewriteCond %{DOCUMENT_ROOT}/client/dist%{REQUEST_URI} -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/client/dist%{REQUEST_URI} -d
+    RewriteRule ^(.*)$ client/dist/$1 [L]
+
+    # Fallback all non-file/non-directory requests (Vue Router history mode) to client/dist/index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ client/dist/index.html [L]
 </IfModule>

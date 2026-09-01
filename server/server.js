@@ -46,6 +46,24 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/feedback', feedbackRouter);
 app.use('/api/v1/feedbacks', feedbackRouter);
 
+// Serve compiled Vue frontend static assets
+const path = require('path');
+const fs = require('fs');
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+
+// Fallback non-API routes to client/dist/index.html for Vue Router (SPA history mode)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const indexPath = path.join(clientDistPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  next();
+});
+
 // 404 handler for unmatched API routes
 app.use((req, res) => {
   return res.status(404).json({
