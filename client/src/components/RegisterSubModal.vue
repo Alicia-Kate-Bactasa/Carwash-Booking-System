@@ -111,7 +111,7 @@ const handleRegister = async () => {
       window.location.href = result.checkout_url;
       return;
     } else {
-      errorMsg.value = result.message || 'Please set your PAYMONGO_SECRET_KEY in server/.env to launch official PayMongo Hosted Checkout.';
+      errorMsg.value = result.message || 'Unable to connect to payment server. Please ensure your backend server is running.';
     }
   } catch (err) {
     errorMsg.value = err.message || 'Registration failed. Please try again.';

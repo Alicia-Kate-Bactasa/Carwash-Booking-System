@@ -3,6 +3,12 @@
 
 DirectoryIndex client/dist/index.html index.html
 
+# Proxy /api requests to local Express Node server if mod_proxy is enabled
+<IfModule mod_proxy.c>
+    ProxyPass /api http://127.0.0.1:5001/api
+    ProxyPassReverse /api http://127.0.0.1:5001/api
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /

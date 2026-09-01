@@ -581,12 +581,12 @@ const submitGuestBooking = async () => {
       return;
     } else {
       if (errorModal.value) {
-        await errorModal.value.show(checkoutData.message || 'Please set your PAYMONGO_SECRET_KEY (sk_test_...) in server/.env to launch the official PayMongo Hosted Checkout Page.');
+        await errorModal.value.show(checkoutData.message || 'Unable to connect to payment server. Please make sure your backend server is running.');
       }
     }
   } catch (err) {
     if (errorModal.value) {
-      await errorModal.value.show(err.message || 'Failed to initialize PayMongo Hosted Checkout session.');
+      await errorModal.value.show(err.message || 'Failed to initialize PayMongo Hosted Checkout session. Please ensure your server is running.');
     }
   } finally {
     bookingLoading.value = false;
