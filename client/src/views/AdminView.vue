@@ -138,6 +138,15 @@
               <p class="text-neutral-500 text-sm mt-2">Manage customer bookings and track the studio schedule.</p>
             </div>
             <div class="flex flex-wrap gap-3 self-end sm:self-auto items-center">
+              <button 
+                @click="openWalkInModal" 
+                class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Walk-In Cash Booking</span>
+              </button>
               <div class="bg-neutral-200/80 p-1 rounded-full flex gap-1">
                 <button 
                   @click="bookingSlide = 'pending'" 
@@ -549,6 +558,79 @@
       </div>
     </div>
 
+    <!-- WALK-IN CUSTOMER CASH BOOKING MODAL -->
+    <div v-if="showWalkInModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div class="bg-white p-8 w-full max-w-md relative rounded-[2rem] shadow-2xl border border-neutral-200 animate-modal-scale-in">
+        <button @click="showWalkInModal = false" type="button" class="absolute top-5 right-5 text-neutral-400 hover:text-black text-xs font-bold focus:outline-none">✕</button>
+        
+        <div class="text-center mb-6">
+          <h3 class="text-lg font-bold uppercase tracking-tight text-black">Log Walk-In Customer</h3>
+          <p class="text-xs text-neutral-400 font-normal mt-1 leading-relaxed">Register counter walk-in appointment. Cash payment is processed immediately.</p>
+        </div>
+
+        <form @submit.prevent="submitWalkInBooking" class="space-y-4">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Customer Full Name</label>
+            <input v-model="walkInForm.full_name" type="text" required placeholder="e.g. Juan Dela Cruz" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Phone Number</label>
+              <input v-model="walkInForm.phone_number" type="tel" required placeholder="e.g. 09171234567" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Email (Optional)</label>
+              <input v-model="walkInForm.email" type="email" placeholder="client@domain.com" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Select Service Package</label>
+            <select v-model="walkInForm.service_id" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-bold focus:outline-none focus:border-black px-4 cursor-pointer">
+              <option v-for="s in activeServicesList" :key="s.service_id" :value="s.service_id">
+                {{ s.service_name }} — ₱{{ s.service_price }}.00 ({{ s.service_duration }} Mins)
+              </option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Scheduled Date</label>
+              <input v-model="walkInForm.scheduled_date" type="date" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-4" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Time Slot</label>
+              <select v-model="walkInForm.time_slot" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-bold focus:outline-none focus:border-black px-4 cursor-pointer">
+                <option value="09:00 AM - 10:00 AM">09:00 AM - 10:00 AM</option>
+                <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
+                <option value="11:00 AM - 12:00 PM">11:00 AM - 12:00 PM</option>
+                <option value="01:00 PM - 02:00 PM">01:00 PM - 02:00 PM</option>
+                <option value="02:00 PM - 03:00 PM">02:00 PM - 03:00 PM</option>
+                <option value="03:00 PM - 04:00 PM">03:00 PM - 04:00 PM</option>
+                <option value="04:00 PM - 05:00 PM">04:00 PM - 05:00 PM</option>
+                <option value="Walk-In Immediate">Immediate Counter Slot</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="border-t border-b border-neutral-200 py-3 flex justify-between items-center text-xs">
+            <span class="font-bold uppercase text-neutral-400">Payment Method:</span>
+            <span class="font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 uppercase">💵 CASH ON HAND</span>
+          </div>
+
+          <div class="flex justify-between items-center text-sm font-bold text-dark bg-neutral-100 p-3.5 rounded-2xl border border-neutral-200">
+            <span>Total Cash Amount:</span>
+            <span class="font-black text-emerald-600 text-base">₱{{ selectedWalkInPrice }}.00</span>
+          </div>
+
+          <button type="submit" :disabled="submittingWalkIn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-sm disabled:opacity-50">
+            {{ submittingWalkIn ? 'Processing Cash Entry...' : 'Confirm Cash Payment & Log Walk-In' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
     <GlobalErrorModal ref="errorModal" />
   </div>
 </template>
@@ -572,6 +654,92 @@ const invoices = ref([]);
 const services = ref([]);
 const subscribers = ref([]);
 const feedbacks = ref([]);
+
+// Walk-In Customer Booking Modal State
+const showWalkInModal = ref(false);
+const submittingWalkIn = ref(false);
+
+const walkInForm = ref({
+  full_name: '',
+  phone_number: '',
+  email: '',
+  service_id: '',
+  scheduled_date: new Date().toISOString().split('T')[0],
+  time_slot: 'Walk-In Immediate'
+});
+
+const activeServicesList = computed(() => {
+  return services.value.filter(s => s.is_active !== false);
+});
+
+const selectedWalkInPrice = computed(() => {
+  if (!walkInForm.value.service_id) return 0;
+  const match = services.value.find(s => String(s.service_id) === String(walkInForm.value.service_id));
+  return match ? parseFloat(match.service_price) : 0;
+});
+
+const openWalkInModal = () => {
+  if (activeServicesList.value.length > 0 && !walkInForm.value.service_id) {
+    walkInForm.value.service_id = activeServicesList.value[0].service_id;
+  }
+  walkInForm.value.scheduled_date = new Date().toISOString().split('T')[0];
+  showWalkInModal.value = true;
+};
+
+const submitWalkInBooking = async () => {
+  if (!walkInForm.value.full_name || !walkInForm.value.service_id) return;
+
+  submittingWalkIn.value = true;
+  try {
+    const apiBase = window.API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('auth_token');
+
+    const res = await fetch(`${apiBase}/admin/walkin`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        full_name: walkInForm.value.full_name,
+        phone_number: walkInForm.value.phone_number || 'Walk-In Counter',
+        email: walkInForm.value.email || null,
+        service_id: parseInt(walkInForm.value.service_id, 10),
+        scheduled_date: walkInForm.value.scheduled_date,
+        time_slot: walkInForm.value.time_slot,
+        price: selectedWalkInPrice.value
+      })
+    });
+
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(result.message || 'Failed to log walk-in booking.');
+    }
+
+    showWalkInModal.value = false;
+    walkInForm.value = {
+      full_name: '',
+      phone_number: '',
+      email: '',
+      service_id: '',
+      scheduled_date: new Date().toISOString().split('T')[0],
+      time_slot: 'Walk-In Immediate'
+    };
+
+    refreshAllAdminData();
+
+    if (errorModal.value) {
+      await errorModal.value.show('Walk-In Customer logged! Cash payment recorded in Payments Ledger & Booking confirmed.', true);
+    }
+  } catch (err) {
+    if (errorModal.value) {
+      await errorModal.value.show(err.message || 'Failed to record walk-in customer.');
+    }
+  } finally {
+    submittingWalkIn.value = false;
+  }
+};
 
 // Filter & Search State for Payments Ledger & Subscription Control
 const paymentSearchQuery = ref('');
