@@ -9,7 +9,7 @@
         <button @click="$emit('close')" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-500 hover:text-dark text-xs font-bold flex items-center justify-center focus:outline-none transition-colors">✕</button>
 
       <div class="text-center mb-6">
-        <h3 class="text-xl font-bold uppercase tracking-tight text-dark">VIP Membership Roster</h3>
+        <h3 class="text-xl font-bold uppercase tracking-tight text-dark">VIP Club Membership</h3>
         <p class="text-xs text-neutral-400 font-medium mt-1">Monthly VIP Access (₱1,500/mo)</p>
       </div>
 
@@ -53,7 +53,7 @@
         </div>
 
         <button type="submit" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-md disabled:opacity-50">
-          {{ loading ? 'Processing...' : 'Pay ₱1,500 & Join VIP Roster' }}
+          {{ loading ? 'Processing...' : 'Pay ₱1,500 & Join VIP Club' }}
         </button>
       </form>
     </div>
