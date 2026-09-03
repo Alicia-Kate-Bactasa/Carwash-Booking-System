@@ -396,12 +396,13 @@
                     <th class="p-5">Subscription ID</th>
                     <th class="p-5">Subscriber Name</th>
                     <th class="p-5">Plan Tier</th>
-                    <th class="p-5 text-right">Status</th>
+                    <th class="p-5">Status</th>
+                    <th class="p-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-xs">
                   <tr v-if="filteredSubscribers.length === 0">
-                    <td colspan="4" class="p-8 text-center text-neutral-400 font-mono">No matching VIP subscriber accounts found.</td>
+                    <td colspan="5" class="p-8 text-center text-neutral-400 font-mono">No matching VIP subscriber accounts found.</td>
                   </tr>
                   <tr v-for="sub in filteredSubscribers" :key="sub.subscription_id">
                     <td class="p-5 font-mono font-bold text-neutral-800">
@@ -411,10 +412,18 @@
                     </td>
                     <td class="p-5 font-bold text-black">{{ sub.user?.username || sub.user?.email || sub.user_name || 'VIP Member' }}</td>
                     <td class="p-5 uppercase font-bold text-neutral-600">{{ sub.plan_tier || 'Unlimited VIP Wash Club' }}</td>
-                    <td class="p-5 text-right">
-                      <span :class="['px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider', sub.plan_status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200']">
-                        {{ sub.plan_status === 'Active' ? 'ACTIVE' : (['CANCELLED', 'PAYMENT_PENDING', 'PENDING', 'EXPIRED', 'INACTIVE'].includes(String(sub.plan_status || '').toUpperCase()) ? 'ACCOUNT INACTIVE' : sub.plan_status) }}
+                    <td class="p-5">
+                      <span :class="['px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider', isSubActive(sub) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200']">
+                        {{ isSubActive(sub) ? 'ACTIVE' : 'ACCOUNT INACTIVE' }}
                       </span>
+                    </td>
+                    <td class="p-5 text-right">
+                      <button 
+                        @click="toggleSubscriptionStatus(sub)"
+                        :class="['text-xs font-bold px-3.5 py-1.5 rounded-full transition-all border', isSubActive(sub) ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50']"
+                      >
+                        {{ isSubActive(sub) ? 'Deactivate Account' : 'Reactivate Account' }}
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -1166,6 +1175,31 @@ const updateBookingStatus = async (bookingId, newStatus) => {
     await loadBookings();
   } catch (err) {
     if (errorModal.value) errorModal.value.show(err.message || 'Failed to update booking status.');
+  }
+};
+
+const isSubActive = (sub) => {
+  if (!sub || !sub.plan_status) return false;
+  return String(sub.plan_status).trim().toLowerCase() === 'active';
+};
+
+const toggleSubscriptionStatus = async (sub) => {
+  try {
+    const apiBase = window.API_BASE_URL || '/api/v1';
+    const newStatus = isSubActive(sub) ? 'Cancellation_Pending' : 'Active';
+    const res = await fetch(`${apiBase}/subscriptions/${sub.subscription_id}/status`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ plan_status: newStatus })
+    });
+    if (res.ok) {
+      await loadSubscriptions();
+      if (errorModal.value) {
+        await errorModal.value.show(`Subscriber SUB-${sub.subscription_id} status updated to ${newStatus === 'Active' ? 'ACTIVE' : 'ACCOUNT INACTIVE'}.`, true);
+      }
+    }
+  } catch (err) {
+    if (errorModal.value) errorModal.value.show('Failed to update subscription status.');
   }
 };
 

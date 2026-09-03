@@ -686,7 +686,7 @@ const fetchSubscriptionDetails = async () => {
         localStorage.setItem('subscriber_plan_status', statusFromDb);
 
         let displayStatus = statusFromDb;
-        if (['CANCELLED', 'PAYMENT_PENDING', 'PENDING', 'EXPIRED', 'INACTIVE'].includes(String(statusFromDb).toUpperCase())) {
+        if (String(statusFromDb).toUpperCase() !== 'ACTIVE') {
           displayStatus = 'Account Inactive';
         }
 

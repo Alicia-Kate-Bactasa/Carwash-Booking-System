@@ -170,8 +170,8 @@ router.post('/cancel', requireAuth, async (req, res) => {
     if (sub && sub.subscription_id) {
       await prisma.subscription.update({
         where: { subscription_id: sub.subscription_id },
-        data: { plan_status: 'Cancelled' }
-      }).catch(() => {});
+        data: { plan_status: 'Cancellation_Pending' }
+      }).catch(err => console.error('Subscription cancel DB update error:', err));
     }
 
     if (requestedEmail.includes('@')) {
