@@ -5,7 +5,7 @@
 // ============================================================================
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -132,11 +132,11 @@ model Subscription {
   user_id                  Int?
   plan_tier                String     @default("Unlimited Basic Wash") @db.VarChar(50)
   plan_status              PlanStatus @default(Payment_Pending)
-  created_at               DateTime?  @default(now()) @db.Timestamptz
+  created_at               DateTime?  @default(now()) @db.Timestamp
   last_billing_date        DateTime?  @db.Date
   next_billing_date        DateTime?  @db.Date
   completed_sessions_count Int?       @default(0)
-  grace_period_start       DateTime?  @db.Timestamptz
+  grace_period_start       DateTime?  @db.Timestamp
 
   user                     User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   invoices                 Invoice[]
@@ -154,7 +154,7 @@ model Booking {
   bay_number        Int           @default(1)
   purchased_price   Decimal       @db.Decimal(10, 2)
   booking_status    BookingStatus @default(Pending)
-  status_updated_at DateTime?     @default(now()) @db.Timestamptz
+  status_updated_at DateTime?     @default(now()) @db.Timestamp
 
   customer          Customer?     @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
   user              User?         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
@@ -170,7 +170,7 @@ model Feedback {
   booking_id  Int?      @unique
   rating      Int?
   comments    String?   @db.Text
-  created_at  DateTime? @default(now()) @db.Timestamptz
+  created_at  DateTime? @default(now()) @db.Timestamp
 
   booking     Booking?  @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
 
@@ -182,7 +182,7 @@ model Invoice {
   booking_id      Int?
   subscription_id Int?
   total_amount    Decimal       @db.Decimal(10, 2)
-  issued_at       DateTime?     @default(now()) @db.Timestamptz
+  issued_at       DateTime?     @default(now()) @db.Timestamp
   invoice_type    InvoiceType
   invoice_status  InvoiceStatus @default(Pending)
 
@@ -197,7 +197,7 @@ model Payment {
   payment_id       Int           @id @default(autoincrement())
   invoice_id       Int
   amount           Decimal       @db.Decimal(10, 2)
-  payment_date     DateTime?     @default(now()) @db.Timestamptz
+  payment_date     DateTime?     @default(now()) @db.Timestamp
   payment_method   String?       @default("GCash") @db.VarChar(30)
   payment_status   PaymentStatus @default(Pending_Approval)
   proof_of_payment String        @db.VarChar(255)
@@ -214,8 +214,8 @@ model UserSecurityAction {
   ip_address  String     @db.VarChar(45)
   identifier  String     @db.VarChar(100)
   token       String?    @unique @db.VarChar(64)
-  expires_at  DateTime?  @db.Timestamptz
-  created_at  DateTime?  @default(now()) @db.Timestamptz
+  expires_at  DateTime?  @db.Timestamp
+  created_at  DateTime?  @default(now()) @db.Timestamp
 
   user        User?      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -230,8 +230,8 @@ model PendingRegistration {
   full_name       String   @db.VarChar(100)
   phone_number    String   @db.VarChar(20)
   password_hash   String   @db.VarChar(255)
-  expires_at      DateTime @db.Timestamptz
-  created_at      DateTime @default(now()) @db.Timestamptz
+  expires_at      DateTime @db.Timestamp
+  created_at      DateTime @default(now()) @db.Timestamp
 
   @@index([email])
   @@map("pending_registrations")

@@ -751,39 +751,55 @@ const handleSubscriptionRenewal = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
     const token = localStorage.getItem('auth_token');
-    const subscriberEmail = localStorage.getItem('subscriber_email') || localStorage.getItem('subscriber_name') || '';
+    const subscriberEmail = localStorage.getItem('subscriber_email') || '';
 
-    const res = await fetch(`${apiBase}/subscriptions/reactivate`, {
+    // 1. Create Renewal Invoice
+    const renewRes = await fetch(`${apiBase}/subscriptions/renew`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ email: subscriberEmail })
+      body: JSON.stringify({ plan_tier: 'Unlimited Basic Wash' })
     });
-    const result = await res.json().catch(() => ({}));
+    const renewData = await renewRes.json().catch(() => ({}));
 
-    if (!res.ok) {
-      throw new Error(result.message || 'Failed to reactivate subscription.');
+    if (!renewRes.ok) {
+      throw new Error(renewData.message || 'Failed to generate renewal invoice.');
     }
 
-    // Apply server-confirmed state only after a successful response
-    const dbStatus = result.data?.plan_status || 'Active';
-    localStorage.setItem('subscriber_plan_status', dbStatus);
-    subscriptionDetails.value.plan_status = dbStatus;
+    const subId = renewData.data?.subscription?.subscription_id;
+    const invId = renewData.data?.invoice?.invoice_id;
 
-    const today = new Date();
-    const nextMonth = new Date();
-    nextMonth.setMonth(today.getMonth() + 1);
-    subscriptionDetails.value.last_billing_date = today.toISOString().split('T')[0];
-    subscriptionDetails.value.next_billing_date = nextMonth.toISOString().split('T')[0];
+    // 2. Request PayMongo Hosted Checkout Session (GCash / Maya / Card)
+    const checkoutRes = await fetch(`${apiBase}/payments/paymongo/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        amount: 1500,
+        service_name: 'VIP Monthly Membership Renewal (₱1,500.00)',
+        subscription_id: subId,
+        invoice_id: invId,
+        client_email: subscriberEmail,
+        return_url: window.location.origin + window.location.pathname
+      })
+    });
 
-    if (errorModal.value) {
-      await errorModal.value.show("Subscription reactivated successfully! VIP perks & ₱0.00 session booking are now active.", true);
+    const checkoutData = await checkoutRes.json().catch(() => ({}));
+
+    if (!checkoutRes.ok || !checkoutData.checkout_url) {
+      throw new Error(checkoutData.message || 'Failed to initialize PayMongo checkout session.');
     }
+
+    // 3. Redirect user to PayMongo Hosted Checkout Page
+    window.location.href = checkoutData.checkout_url;
+
   } catch (err) {
     if (errorModal.value) {
-      await errorModal.value.show(err.message || 'Failed to reactivate subscription. Please try again.', false);
+      await errorModal.value.show(err.message || 'Failed to process renewal checkout. Please try again.', false);
     }
   }
 };
