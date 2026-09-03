@@ -174,7 +174,7 @@ router.post('/walkin', async (req, res) => {
           time_slot: time_slot || 'Walk-In Immediate',
           bay_number: 1,
           purchased_price: finalPrice,
-          booking_status: 'Completed'
+          booking_status: 'Pending'
         }
       });
 
