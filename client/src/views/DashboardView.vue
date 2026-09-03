@@ -407,6 +407,8 @@
         v-if="selectedReschedule" 
         :bookingId="selectedReschedule.id" 
         :rawBookingId="selectedReschedule.booking_id" 
+        :currentDate="selectedReschedule.date"
+        :currentTime="selectedReschedule.time"
         @close="selectedReschedule = null" 
         @updated="loadAppointments" 
       />
