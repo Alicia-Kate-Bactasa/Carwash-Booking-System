@@ -558,74 +558,117 @@
       </div>
     </div>
 
-    <!-- WALK-IN CUSTOMER CASH BOOKING MODAL -->
-    <div v-if="showWalkInModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div class="bg-white p-8 w-full max-w-md relative rounded-[2rem] shadow-2xl border border-neutral-200 animate-modal-scale-in">
-        <button @click="showWalkInModal = false" type="button" class="absolute top-5 right-5 text-neutral-400 hover:text-black text-xs font-bold focus:outline-none">✕</button>
+    <!-- WALK-IN CUSTOMER CASH BOOKING WIZARD MODAL -->
+    <div v-if="showWalkInModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div class="bg-white p-8 w-full max-w-xl relative rounded-[2.5rem] shadow-2xl border border-neutral-200 animate-modal-scale-in my-8 max-h-[90vh] overflow-y-auto">
+        <button @click="showWalkInModal = false" type="button" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-500 hover:text-black text-xs font-bold flex items-center justify-center focus:outline-none transition-colors">✕</button>
         
         <div class="text-center mb-6">
-          <h3 class="text-lg font-bold uppercase tracking-tight text-black">Log Walk-In Customer</h3>
-          <p class="text-xs text-neutral-400 font-normal mt-1 leading-relaxed">Register counter walk-in appointment. Cash payment is processed immediately.</p>
+          <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 inline-block mb-2">Counter Walk-In Wizard</span>
+          <h3 class="text-xl font-black uppercase tracking-tight text-black">Log Walk-In Cash Booking</h3>
+          <p class="text-xs text-neutral-400 font-normal mt-1 leading-relaxed">Select package, live studio date & time slot. Cash payment is verified instantly.</p>
         </div>
 
-        <form @submit.prevent="submitWalkInBooking" class="space-y-4">
-          <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Customer Full Name</label>
-            <input v-model="walkInForm.full_name" type="text" required placeholder="e.g. Juan Dela Cruz" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
+        <form @submit.prevent="submitWalkInBooking" class="space-y-6">
+          <!-- Customer Info Block -->
+          <div class="space-y-4 bg-neutral-50 p-5 rounded-[1.5rem] border border-neutral-200/80">
+            <div class="text-xs font-bold uppercase tracking-wider text-neutral-400">1. Customer Contact</div>
             <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Phone Number</label>
-              <input v-model="walkInForm.phone_number" type="tel" required placeholder="e.g. 09171234567" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Customer Full Name</label>
+              <input v-model="walkInForm.full_name" type="text" required placeholder="e.g. Juan Dela Cruz" class="w-full bg-white border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
             </div>
-            <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Email (Optional)</label>
-              <input v-model="walkInForm.email" type="email" placeholder="client@domain.com" class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
-            </div>
-          </div>
 
-          <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Select Service Package</label>
-            <select v-model="walkInForm.service_id" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-bold focus:outline-none focus:border-black px-4 cursor-pointer">
-              <option v-for="s in activeServicesList" :key="s.service_id" :value="s.service_id">
-                {{ s.service_name }} — ₱{{ s.service_price }}.00 ({{ s.service_duration }} Mins)
-              </option>
-            </select>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Scheduled Date</label>
-              <input v-model="walkInForm.scheduled_date" type="date" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-4" />
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Time Slot</label>
-              <select v-model="walkInForm.time_slot" required class="w-full bg-neutral-50 border border-neutral-200 p-3.5 rounded-full text-xs font-bold focus:outline-none focus:border-black px-4 cursor-pointer">
-                <option value="09:00 AM - 10:00 AM">09:00 AM - 10:00 AM</option>
-                <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
-                <option value="11:00 AM - 12:00 PM">11:00 AM - 12:00 PM</option>
-                <option value="01:00 PM - 02:00 PM">01:00 PM - 02:00 PM</option>
-                <option value="02:00 PM - 03:00 PM">02:00 PM - 03:00 PM</option>
-                <option value="03:00 PM - 04:00 PM">03:00 PM - 04:00 PM</option>
-                <option value="04:00 PM - 05:00 PM">04:00 PM - 05:00 PM</option>
-                <option value="Walk-In Immediate">Immediate Counter Slot</option>
-              </select>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Phone Number</label>
+                <input v-model="walkInForm.phone_number" type="tel" required placeholder="e.g. 09171234567" class="w-full bg-white border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Email (Optional)</label>
+                <input v-model="walkInForm.email" type="email" placeholder="client@domain.com" class="w-full bg-white border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5" />
+              </div>
             </div>
           </div>
 
-          <div class="border-t border-b border-neutral-200 py-3 flex justify-between items-center text-xs">
-            <span class="font-bold uppercase text-neutral-400">Payment Method:</span>
-            <span class="font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 uppercase">💵 CASH ON HAND</span>
+          <!-- Service Package Selection Wizard -->
+          <div class="space-y-4 bg-neutral-50 p-5 rounded-[1.5rem] border border-neutral-200/80">
+            <div class="text-xs font-bold uppercase tracking-wider text-neutral-400">2. Service & Studio Schedule</div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">Select Detailing Service</label>
+              <ServiceSelector 
+                v-model="walkInForm.service_id" 
+                :services="activeServicesList" 
+                placeholder="Choose Detailing Package..."
+                @change="onWalkInServiceChange"
+              />
+            </div>
+
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">Scheduled Date</label>
+              <input 
+                v-model="walkInForm.scheduled_date" 
+                type="date" 
+                :min="todayStr"
+                required 
+                @change="onWalkInDateChange"
+                class="w-full bg-white border border-neutral-200 p-3.5 rounded-full text-xs font-semibold focus:outline-none focus:border-black px-5 cursor-pointer" 
+              />
+            </div>
+
+            <!-- Dynamic Time Slot Grid -->
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">Available Time Slots</label>
+              <div v-if="!walkInForm.service_id" class="text-xs text-neutral-400 font-medium italic p-3 text-center bg-white rounded-2xl border border-neutral-200">
+                Please select a service package first.
+              </div>
+              <div v-else-if="!walkInForm.scheduled_date" class="text-xs text-neutral-400 font-medium italic p-3 text-center bg-white rounded-2xl border border-neutral-200">
+                Please select a date to check live bay slots.
+              </div>
+              <div v-else-if="loadingWalkInSlots" class="text-xs text-neutral-500 font-semibold p-3 text-center bg-white rounded-2xl border border-neutral-200 animate-pulse">
+                Checking studio bay availability...
+              </div>
+              <div v-else-if="walkInAvailableSlots.length === 0" class="text-xs text-red-500 font-semibold p-3 text-center bg-red-50 rounded-2xl border border-red-200">
+                No available slots for this date & service duration. Please choose another date.
+              </div>
+              <div v-else class="max-h-48 overflow-y-auto rounded-[1.5rem] bg-white p-3 border border-neutral-200 shadow-inner grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  v-for="slot in walkInAvailableSlots"
+                  :key="slot.timeSlotValue"
+                  type="button"
+                  @click="walkInForm.time_slot = slot.timeSlotValue"
+                  :class="[
+                    'p-3 rounded-full text-xs font-bold transition-all text-center border focus:outline-none',
+                    walkInForm.time_slot === slot.timeSlotValue
+                      ? 'bg-black text-white border-black shadow-md scale-[1.02]'
+                      : 'bg-neutral-50 text-neutral-700 border-neutral-200 hover:border-black hover:bg-neutral-100'
+                  ]"
+                >
+                  {{ slot.label }}
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div class="flex justify-between items-center text-sm font-bold text-dark bg-neutral-100 p-3.5 rounded-2xl border border-neutral-200">
-            <span>Total Cash Amount:</span>
-            <span class="font-black text-emerald-600 text-base">₱{{ selectedWalkInPrice }}.00</span>
+          <!-- Summary & Cash Payment Summary Card -->
+          <div class="bg-neutral-900 text-white p-6 rounded-[1.8rem] space-y-3 shadow-lg">
+            <div class="text-[10px] uppercase tracking-widest text-neutral-400 font-bold border-b border-neutral-800 pb-2">Walk-In Booking Summary</div>
+            <div class="flex justify-between text-xs"><span class="text-neutral-400">Service:</span><span class="font-bold text-white">{{ selectedWalkInServiceName }}</span></div>
+            <div class="flex justify-between text-xs"><span class="text-neutral-400">Date & Slot:</span><span class="font-bold text-white">{{ walkInForm.scheduled_date || '—' }} ({{ walkInForm.time_slot || 'No slot chosen' }})</span></div>
+            <div class="flex justify-between text-xs"><span class="text-neutral-400">Duration:</span><span class="font-bold text-white">{{ selectedWalkInDurationMinutes }} Mins</span></div>
+            
+            <div class="border-t border-neutral-800 pt-3 flex justify-between items-center text-xs">
+              <span class="text-neutral-400 uppercase font-bold">Payment Method:</span>
+              <span class="font-black text-emerald-400 bg-emerald-950 px-3 py-1 rounded-full border border-emerald-800 uppercase tracking-wider text-[10px]">💵 CASH ON HAND (Counter)</span>
+            </div>
+
+            <div class="border-t border-neutral-800 pt-3 flex justify-between items-center text-sm font-bold">
+              <span>Total Cash Collected:</span>
+              <span class="font-black text-emerald-400 text-lg font-mono">₱{{ selectedWalkInPrice }}.00</span>
+            </div>
           </div>
 
-          <button type="submit" :disabled="submittingWalkIn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-sm disabled:opacity-50">
-            {{ submittingWalkIn ? 'Processing Cash Entry...' : 'Confirm Cash Payment & Log Walk-In' }}
+          <button type="submit" :disabled="submittingWalkIn || !walkInForm.time_slot" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-widest uppercase py-4 rounded-full transition-all shadow-md disabled:opacity-50">
+            {{ submittingWalkIn ? 'Recording Cash Transaction...' : 'Confirm Cash Payment & Log Walk-In' }}
           </button>
         </form>
       </div>
@@ -637,6 +680,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import ServiceSelector from '@/components/ServiceSelector.vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 
 const isSidebarCollapsed = ref(false);
@@ -655,18 +699,58 @@ const services = ref([]);
 const subscribers = ref([]);
 const feedbacks = ref([]);
 
-// Walk-In Customer Booking Modal State
+// Walk-In Customer Booking Modal State & Live Availability Algorithm
 const showWalkInModal = ref(false);
 const submittingWalkIn = ref(false);
+const walkInBookedSlots = ref([]);
+const loadingWalkInSlots = ref(false);
 
 const walkInForm = ref({
   full_name: '',
   phone_number: '',
   email: '',
   service_id: '',
-  scheduled_date: new Date().toISOString().split('T')[0],
-  time_slot: 'Walk-In Immediate'
+  scheduled_date: '',
+  time_slot: ''
 });
+
+const todayStr = computed(() => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+});
+
+const currentMinutesToday = computed(() => {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+});
+
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3] ? match[3].toUpperCase() : null;
+
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+const formatMinutesTo12H = (mins) => {
+  let hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  const period = hours >= 12 ? 'PM' : 'AM';
+  if (hours > 12) hours -= 12;
+  if (hours === 0) hours = 12;
+  const hStr = hours < 10 ? '0' + hours : String(hours);
+  const mStr = minutes < 10 ? '0' + minutes : String(minutes);
+  return `${hStr}:${mStr} ${period}`;
+};
 
 const activeServicesList = computed(() => {
   return services.value.filter(s => s.is_active !== false);
@@ -678,16 +762,108 @@ const selectedWalkInPrice = computed(() => {
   return match ? parseFloat(match.service_price) : 0;
 });
 
+const selectedWalkInDurationMinutes = computed(() => {
+  if (!walkInForm.value.service_id) return 60;
+  const match = services.value.find(s => String(s.service_id || s.name) === String(walkInForm.value.service_id));
+  if (!match) return 60;
+  const durStr = String(match.service_duration || match.duration || '60');
+  const parsed = durStr.match(/\d+/);
+  return parsed ? parseInt(parsed[0], 10) : 60;
+});
+
+const selectedWalkInServiceName = computed(() => {
+  const match = services.value.find(s => String(s.service_id) === String(walkInForm.value.service_id));
+  return match ? match.service_name : 'Please Select a Service';
+});
+
+const fetchWalkInBookedSlots = async (date) => {
+  if (!date) return;
+  loadingWalkInSlots.value = true;
+  try {
+    const apiBase = window.API_BASE_URL || '/api/v1';
+    const res = await fetch(`${apiBase}/bookings/availability?date=${date}`);
+    if (res.ok) {
+      const result = await res.json();
+      walkInBookedSlots.value = result.data?.booked_slots || [];
+    }
+  } catch (err) {
+    console.warn("Could not fetch booked slots for walk-in:", err);
+  } finally {
+    loadingWalkInSlots.value = false;
+  }
+};
+
+const onWalkInDateChange = () => {
+  walkInForm.value.time_slot = '';
+  if (walkInForm.value.scheduled_date) {
+    fetchWalkInBookedSlots(walkInForm.value.scheduled_date);
+  }
+};
+
+const onWalkInServiceChange = () => {
+  walkInForm.value.time_slot = '';
+  if (walkInForm.value.scheduled_date) {
+    fetchWalkInBookedSlots(walkInForm.value.scheduled_date);
+  }
+};
+
+const walkInAvailableSlots = computed(() => {
+  if (!walkInForm.value.service_id || !walkInForm.value.scheduled_date) return [];
+
+  const duration = selectedWalkInDurationMinutes.value;
+  const dayStart = 9 * 60;
+  const dayEnd = 17 * 60;
+  const step = 30;
+
+  const slots = [];
+  const isToday = walkInForm.value.scheduled_date === todayStr.value;
+  const nowMins = currentMinutesToday.value;
+
+  for (let start = dayStart; start + duration <= dayEnd; start += step) {
+    const end = start + duration;
+    const label = `${formatMinutesTo12H(start)} - ${formatMinutesTo12H(end)}`;
+
+    if (isToday && start <= nowMins) continue;
+
+    let isOverlap = false;
+    for (const booked of walkInBookedSlots.value) {
+      let bStart = 0;
+      let bEnd = 0;
+      if (booked.time_slot && booked.time_slot.includes('-')) {
+        const parts = booked.time_slot.split('-');
+        bStart = parseTimeToMinutes(parts[0].trim());
+        bEnd = parseTimeToMinutes(parts[1].trim());
+      } else if (booked.time_slot) {
+        bStart = parseTimeToMinutes(booked.time_slot);
+        bEnd = bStart + 60;
+      }
+
+      if (Math.max(start, bStart) < Math.min(end, bEnd)) {
+        isOverlap = true;
+        break;
+      }
+    }
+
+    if (!isOverlap) {
+      slots.push({ label, timeSlotValue: label });
+    }
+  }
+
+  return slots;
+});
+
 const openWalkInModal = () => {
   if (activeServicesList.value.length > 0 && !walkInForm.value.service_id) {
     walkInForm.value.service_id = activeServicesList.value[0].service_id;
   }
-  walkInForm.value.scheduled_date = new Date().toISOString().split('T')[0];
+  walkInForm.value.scheduled_date = todayStr.value;
+  walkInForm.value.time_slot = '';
+  fetchWalkInBookedSlots(todayStr.value);
   showWalkInModal.value = true;
 };
 
 const submitWalkInBooking = async () => {
-  if (!walkInForm.value.full_name || !walkInForm.value.service_id) return;
+  if (!walkInForm.value.full_name || !walkInForm.value.service_id || !walkInForm.value.time_slot) return;
 
   submittingWalkIn.value = true;
   try {
@@ -723,8 +899,8 @@ const submitWalkInBooking = async () => {
       phone_number: '',
       email: '',
       service_id: '',
-      scheduled_date: new Date().toISOString().split('T')[0],
-      time_slot: 'Walk-In Immediate'
+      scheduled_date: todayStr.value,
+      time_slot: ''
     };
 
     refreshAllAdminData();
