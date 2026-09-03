@@ -838,6 +838,49 @@ const handleCancelSubscription = async () => {
   }
 };
 
+const checkPaymentRedirect = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get('payment');
+  const subscriptionId = urlParams.get('subscription_id');
+  const invoiceId = urlParams.get('invoice_id');
+
+  if (paymentStatus === 'success' && (subscriptionId || invoiceId)) {
+    try {
+      const apiBase = window.API_BASE_URL || '/api/v1';
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${apiBase}/payments/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          subscription_id: subscriptionId ? parseInt(subscriptionId, 10) : undefined,
+          invoice_id: invoiceId ? parseInt(invoiceId, 10) : undefined,
+          payment_method: 'PayMongo (Verified Checkout)'
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.status === 'success') {
+        localStorage.setItem('subscriber_plan_status', 'Active');
+        subscriptionDetails.value.plan_status = 'Active';
+        await fetchSubscriptionDetails();
+        if (errorModal.value) {
+          await errorModal.value.show('Payment Verified! Your VIP Membership renewal is now ACTIVE.', true);
+        }
+      }
+    } catch (e) {
+      console.error('Subscription payment verification error:', e);
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (paymentStatus === 'cancel') {
+    if (errorModal.value) {
+      await errorModal.value.show('Payment was cancelled or failed. Your subscription remains inactive until paid.', false);
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+};
+
 const logout = async () => {
   localStorage.removeItem('subscriber_session_active');
   localStorage.removeItem('subscriber_name');
@@ -851,5 +894,6 @@ onMounted(() => {
   loadAppointments();
   fetchCatalogServices();
   fetchSubscriptionDetails();
+  checkPaymentRedirect();
 });
 </script>

@@ -199,9 +199,9 @@ router.post('/cancel', requireAuth, async (req, res) => {
 
 /**
  * POST /api/v1/subscriptions/reactivate
- * Reactivate a subscription. Users reactivate their own account; admins may reactivate any account.
+ * Reactivate a subscription. Admin only. Members must pay via PayMongo checkout.
  */
-router.post('/reactivate', requireAuth, async (req, res) => {
+router.post('/reactivate', requireAuth, requireAdmin, async (req, res) => {
   try {
     const requesterEmail = req.user.email.trim().toLowerCase();
     const isAdmin = req.user.role === 'Admin';
