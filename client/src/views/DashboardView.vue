@@ -685,9 +685,14 @@ const fetchSubscriptionDetails = async () => {
 
         localStorage.setItem('subscriber_plan_status', statusFromDb);
 
+        let displayStatus = statusFromDb;
+        if (['CANCELLED', 'PAYMENT_PENDING', 'PENDING', 'EXPIRED', 'INACTIVE'].includes(String(statusFromDb).toUpperCase())) {
+          displayStatus = 'Account Inactive';
+        }
+
         subscriptionDetails.value = {
           subscription_id: sub.subscription_id || null,
-          plan_status: statusFromDb,
+          plan_status: displayStatus,
           created_at: sub.created_at ? String(sub.created_at).split('T')[0] : new Date().toISOString().split('T')[0],
           last_billing_date: sub.last_billing_date ? String(sub.last_billing_date).split('T')[0] : new Date().toISOString().split('T')[0],
           next_billing_date: sub.next_billing_date ? String(sub.next_billing_date).split('T')[0] : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
@@ -839,7 +844,7 @@ const handleCancelSubscription = async () => {
 
     // Apply server-confirmed state only after a successful response
     localStorage.setItem('subscriber_plan_status', 'Cancelled');
-    subscriptionDetails.value.plan_status = 'Cancelled';
+    subscriptionDetails.value.plan_status = 'Account Inactive';
 
     if (errorModal.value) {
       await errorModal.value.show("Subscription plan cancelled successfully. Unlimited booking is now disabled for inactive accounts.", true);

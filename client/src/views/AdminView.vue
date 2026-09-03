@@ -412,8 +412,8 @@
                     <td class="p-5 font-bold text-black">{{ sub.user?.username || sub.user?.email || sub.user_name || 'VIP Member' }}</td>
                     <td class="p-5 uppercase font-bold text-neutral-600">{{ sub.plan_tier || 'Unlimited VIP Wash Club' }}</td>
                     <td class="p-5 text-right">
-                      <span :class="['px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider', (sub.plan_status === 'Active' || !sub.plan_status) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200']">
-                        {{ sub.plan_status || 'ACTIVE' }}
+                      <span :class="['px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider', sub.plan_status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200']">
+                        {{ sub.plan_status === 'Active' ? 'ACTIVE' : (['CANCELLED', 'PAYMENT_PENDING', 'PENDING', 'EXPIRED', 'INACTIVE'].includes(String(sub.plan_status || '').toUpperCase()) ? 'ACCOUNT INACTIVE' : sub.plan_status) }}
                       </span>
                     </td>
                   </tr>
