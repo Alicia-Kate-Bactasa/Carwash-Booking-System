@@ -615,7 +615,10 @@ const selectedServiceName = computed(() => {
 const loadAppointments = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/user/bookings`);
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(`${apiBase}/bookings/user/bookings`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
     if (res.ok) {
       const data = await res.json();
       const mapped = (data || []).map(app => {
@@ -745,23 +748,29 @@ const submitMemberBooking = async () => {
 };
 
 const handleSubscriptionRenewal = async () => {
-  // Synchronous immediate state activation
-  localStorage.setItem('subscriber_plan_status', 'Active');
-  subscriptionDetails.value.plan_status = 'Active';
-
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
     const token = localStorage.getItem('auth_token');
     const subscriberEmail = localStorage.getItem('subscriber_email') || localStorage.getItem('subscriber_name') || '';
 
-    await fetch(`${apiBase}/subscriptions/reactivate`, {
+    const res = await fetch(`${apiBase}/subscriptions/reactivate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify({ email: subscriberEmail })
-    }).catch(() => {});
+    });
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(result.message || 'Failed to reactivate subscription.');
+    }
+
+    // Apply server-confirmed state only after a successful response
+    const dbStatus = result.data?.plan_status || 'Active';
+    localStorage.setItem('subscriber_plan_status', dbStatus);
+    subscriptionDetails.value.plan_status = dbStatus;
 
     const today = new Date();
     const nextMonth = new Date();
@@ -774,36 +783,41 @@ const handleSubscriptionRenewal = async () => {
     }
   } catch (err) {
     if (errorModal.value) {
-      await errorModal.value.show("Subscription reactivated successfully! VIP perks & ₱0.00 session booking are now active.", true);
+      await errorModal.value.show(err.message || 'Failed to reactivate subscription. Please try again.', false);
     }
   }
 };
 
 const handleCancelSubscription = async () => {
-  // Synchronous immediate state cancellation
-  localStorage.setItem('subscriber_plan_status', 'Cancelled');
-  subscriptionDetails.value.plan_status = 'Cancelled';
-
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
     const token = localStorage.getItem('auth_token');
     const subscriberEmail = localStorage.getItem('subscriber_email') || localStorage.getItem('subscriber_name') || '';
 
-    await fetch(`${apiBase}/subscriptions/cancel`, {
+    const res = await fetch(`${apiBase}/subscriptions/cancel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify({ email: subscriberEmail })
-    }).catch(() => {});
+    });
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(result.message || 'Failed to cancel subscription.');
+    }
+
+    // Apply server-confirmed state only after a successful response
+    localStorage.setItem('subscriber_plan_status', 'Cancelled');
+    subscriptionDetails.value.plan_status = 'Cancelled';
 
     if (errorModal.value) {
       await errorModal.value.show("Subscription plan cancelled successfully. Unlimited booking is now disabled for inactive accounts.", true);
     }
   } catch (err) {
     if (errorModal.value) {
-      await errorModal.value.show("Subscription plan cancelled successfully. Unlimited booking is now disabled for inactive accounts.", true);
+      await errorModal.value.show(err.message || 'Failed to cancel subscription. Please try again.', false);
     }
   }
 };

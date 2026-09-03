@@ -12,9 +12,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { sendInvoiceEmail } = require('../services/mailer');
 const { z } = require('zod');
-
-// Environment JWT secret configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
+const { JWT_SECRET } = require('../config');
 
 // Zod validation schema for manual payment submission
 const submitPaymentSchema = z.object({
@@ -198,21 +196,6 @@ router.post('/paymongo/checkout', async (req, res) => {
     const { invoice_id, booking_id, subscription_id, amount, service_name, client_email, return_url } = req.body;
 
     const numericAmount = parseFloat(amount) || 250;
-    const path = require('path');
-    const fs = require('fs');
-    const dotenv = require('dotenv');
-    const envPaths = [
-      path.join(__dirname, '../.env'),
-      path.join(__dirname, '../../.env'),
-      path.join(process.cwd(), 'server/.env'),
-      path.join(process.cwd(), '.env')
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        dotenv.config({ path: envPath, override: true });
-      }
-    }
-
     const rawKey = process.env.PAYMONGO_SECRET_KEY || '';
     const paymongoKey = rawKey.trim();
     const itemDescription = service_name || 'Montage Auto Studio Detailing Service';
@@ -290,11 +273,9 @@ router.post('/paymongo/checkout', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating PayMongo checkout session:', error);
-    return res.status(200).json({
-      status: 'success',
-      provider: 'paymongo_sandbox',
-      sandbox: true,
-      checkout_url: null
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to create PayMongo checkout session.'
     });
   }
 });
@@ -309,14 +290,17 @@ router.post('/verify', async (req, res) => {
 
     // Handle Atomic Registration on Payment Verification
     if (reg_token) {
-      let payload;
-      try {
-        payload = jwt.verify(reg_token, JWT_SECRET);
-      } catch (err) {
+      // Registration token is an opaque random reference; the password hash and
+      // profile live server-side and are never carried in the redirect URL.
+      const pending = await prisma.pendingRegistration.findUnique({
+        where: { token: reg_token }
+      });
+
+      if (!pending || pending.expires_at < new Date()) {
         return res.status(400).json({ status: 'error', message: 'Registration payment session is invalid or has expired.' });
       }
 
-      const { email, username, full_name, phone_number, hashedPassword } = payload;
+      const { email, username, full_name, phone_number, password_hash: hashedPassword } = pending;
 
       if (!email || !hashedPassword) {
         return res.status(400).json({ status: 'error', message: 'Invalid registration payload.' });
@@ -393,6 +377,9 @@ router.post('/verify', async (req, res) => {
         finalSub = atomicResult.subscription;
         finalInv = atomicResult.invoice;
       }
+
+      // Registration token was successfully redeemed: delete the temporary record
+      await prisma.pendingRegistration.delete({ where: { token: reg_token } });
 
       // Generate JWT auth token for instant login
       const token = jwt.sign(

@@ -221,3 +221,18 @@ model UserSecurityAction {
 
   @@map("user_security_actions")
 }
+
+model PendingRegistration {
+  pending_id      Int      @id @default(autoincrement())
+  token           String   @unique @db.VarChar(64)
+  email           String   @db.VarChar(100)
+  username        String   @db.VarChar(50)
+  full_name       String   @db.VarChar(100)
+  phone_number    String   @db.VarChar(20)
+  password_hash   String   @db.VarChar(255)
+  expires_at      DateTime @db.Timestamptz
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  @@index([email])
+  @@map("pending_registrations")
+}

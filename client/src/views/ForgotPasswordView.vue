@@ -186,6 +186,10 @@ const handleVerifyOtp = async () => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'Invalid or expired 6-digit code.');
 
+    // Carry verified email + OTP forward for the secure reset step
+    sessionStorage.setItem('reset_email', email.value.trim().toLowerCase());
+    sessionStorage.setItem('reset_otp', otp.value.trim());
+
     step.value = 3;
     subtitle.value = 'Choose a secure new password for your account.';
     statusMsg.value = 'OTP code verified! Please enter your new password.';

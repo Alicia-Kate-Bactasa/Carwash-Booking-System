@@ -123,6 +123,13 @@ router.post('/', validate(feedbackSchema), async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Booking not found.' });
     }
 
+    if (booking.booking_status !== 'Completed') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Feedback can only be submitted once the service is Completed.'
+      });
+    }
+
     const existingFeedback = await prisma.feedback.findUnique({
       where: { booking_id }
     });

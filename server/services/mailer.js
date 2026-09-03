@@ -7,6 +7,17 @@
 const nodemailer = require('nodemailer');
 
 /**
+ * HTML-escapes user-supplied values before embedding them in email templates
+ * to prevent HTML injection / email content-based XSS.
+ */
+const esc = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+/**
  * Creates and returns Nodemailer SMTP Transporter using environment credentials.
  * Defaults to Gmail SMTP port 465 (secure SSL).
  */
@@ -103,7 +114,7 @@ const renderRefCard = ({ bookingId, invoiceId, clientName }) => `
   <table style="width:100%; border-collapse:collapse; font-size:13px; color:#111111;">
     <tr>
       <td style="padding:4px 0; color:#737373; font-weight:600; width:40%;">Customer Name:</td>
-      <td style="padding:4px 0; font-weight:800; text-align:right;">${clientName || 'Valued Customer'}</td>
+      <td style="padding:4px 0; font-weight:800; text-align:right;">${esc(clientName || 'Valued Customer')}</td>
     </tr>
     ${bookingId ? `
     <tr>
@@ -127,7 +138,7 @@ const renderRefCard = ({ bookingId, invoiceId, clientName }) => `
 const sendPaymentSuccessInvoiceEmail = async ({ to, clientName, invoiceId, bookingId, serviceName, amount, date }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
       Thank you for your payment! Your transaction has been verified successfully.
     </p>
 
@@ -142,7 +153,7 @@ const sendPaymentSuccessInvoiceEmail = async ({ to, clientName, invoiceId, booki
       </thead>
       <tbody>
         <tr style="border-bottom:1px solid #EEEEEE;">
-          <td style="padding:14px 0; font-weight:600; color:#333333;">${serviceName || 'Detailing Package Treatment'}</td>
+          <td style="padding:14px 0; font-weight:600; color:#333333;">${esc(serviceName || 'Detailing Package Treatment')}</td>
           <td style="padding:14px 0; font-weight:800; text-align:right; color:#111111;">₱${parseFloat(amount || 0).toFixed(2)}</td>
         </tr>
       </tbody>
@@ -172,7 +183,7 @@ const sendPaymentSuccessInvoiceEmail = async ({ to, clientName, invoiceId, booki
 const sendBookingCompletedEmail = async ({ to, clientName, invoiceId, bookingId, serviceName, date, timeSlot }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
       Your appointment session is now officially confirmed and scheduled in our Banilad twin-bay facility!
     </p>
 
@@ -181,7 +192,7 @@ const sendBookingCompletedEmail = async ({ to, clientName, invoiceId, bookingId,
     <div style="background-color:#F8F9FA; border-left:4px solid #111111; padding:16px 20px; border-radius:8px; margin:24px 0; font-size:13px; line-height:1.6;">
       <strong>Scheduled Date:</strong> ${date ? String(date).split('T')[0] : '—'}<br>
       <strong>Time Slot Window:</strong> ${timeSlot || '—'}<br>
-      <strong>Selected Treatment:</strong> ${serviceName || 'Standard Car Wash'}
+      <strong>Selected Treatment:</strong> ${esc(serviceName || 'Standard Car Wash')}
     </div>
   `;
 
@@ -204,14 +215,14 @@ const sendBookingCompletedEmail = async ({ to, clientName, invoiceId, bookingId,
 const sendPaymentFailedEmail = async ({ to, clientName, bookingId, invoiceId, serviceName, reason }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
-      We were unable to process your payment for <strong>${serviceName || 'Detailing Session'}</strong>.
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
+      We were unable to process your payment for <strong>${esc(serviceName || 'Detailing Session')}</strong>.
     </p>
 
     ${renderRefCard({ bookingId, invoiceId, clientName })}
 
     <p style="font-size:13px; color:#EF4444; font-weight:600; background-color:#FEF2F2; padding:14px; border-radius:10px; border:1px solid #FCA5A5;">
-      Reason: ${reason || 'Payment checkout session was cancelled or failed verification.'}
+      Reason: ${esc(reason || 'Payment checkout session was cancelled or failed verification.')}
     </p>
   `;
 
@@ -234,7 +245,7 @@ const sendPaymentFailedEmail = async ({ to, clientName, bookingId, invoiceId, se
 const sendRegistrationSuccessEmail = async ({ to, clientName, invoiceId, email, planTier = 'Unlimited VIP Wash Club', amount = '1,500' }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Welcome to the Club, <strong>${clientName || 'VIP Member'}</strong>!<br>
+      Welcome to the Club, <strong>${esc(clientName || 'VIP Member')}</strong>!<br>
       Your payment of ₱${amount} has been verified and your VIP Membership Account is now fully active.
     </p>
 
@@ -266,12 +277,12 @@ const sendRegistrationSuccessEmail = async ({ to, clientName, invoiceId, email, 
 const sendRegistrationFailedEmail = async ({ to, clientName, reason }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Hello <strong>${clientName || 'Valued Customer'}</strong>,<br>
+      Hello <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
       Your VIP membership account registration could not be completed because payment was cancelled or declined. No charges were created and no account data was saved.
     </p>
 
     <p style="font-size:13px; color:#EF4444; font-weight:600; background-color:#FEF2F2; padding:14px; border-radius:10px; border:1px solid #FCA5A5;">
-      Notice: ${reason || 'Checkout transaction was cancelled.'}
+      Notice: ${esc(reason || 'Checkout transaction was cancelled.')}
     </p>
   `;
 
@@ -324,7 +335,7 @@ const sendPasswordResetOtpEmail = async ({ to, otp }) => {
 const sendRescheduleEmail = async ({ to, clientName, bookingId, invoiceId, serviceName, oldDate, oldTime, newDate, newTime }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
       Your appointment session <strong>MTG-${bookingId}</strong> has been rescheduled.
     </p>
 
@@ -355,8 +366,8 @@ const sendRescheduleEmail = async ({ to, clientName, bookingId, invoiceId, servi
 const sendUserCancelBookingEmail = async ({ to, clientName, bookingId, invoiceId, serviceName }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
-      As requested, your appointment booking <strong>MTG-${bookingId}</strong> for <strong>${serviceName || 'Detailing Treatment'}</strong> has been cancelled.
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
+      As requested, your appointment booking <strong>MTG-${bookingId}</strong> for <strong>${esc(serviceName || 'Detailing Treatment')}</strong> has been cancelled.
     </p>
 
     ${renderRefCard({ bookingId, invoiceId, clientName })}
@@ -381,7 +392,7 @@ const sendUserCancelBookingEmail = async ({ to, clientName, bookingId, invoiceId
 const sendAdminCancelBookingEmail = async ({ to, clientName, bookingId, invoiceId, serviceName, reason }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
       Your appointment booking <strong>MTG-${bookingId}</strong> was updated to Cancelled by our studio management.
     </p>
 
@@ -389,7 +400,7 @@ const sendAdminCancelBookingEmail = async ({ to, clientName, bookingId, invoiceI
 
     ${reason ? `
       <p style="font-size:13px; color:#EF4444; background-color:#FEF2F2; padding:12px; border-radius:8px;">
-        Reason: ${reason}
+        Reason: ${esc(reason)}
       </p>
     ` : ''}
   `;
@@ -413,8 +424,8 @@ const sendAdminCancelBookingEmail = async ({ to, clientName, bookingId, invoiceI
 const sendAdminCompleteBookingEmail = async ({ to, clientName, bookingId, invoiceId, serviceName }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'Valued Customer'}</strong>,<br>
-      Your detailing treatment <strong>${serviceName || 'Car Wash Package'}</strong> for booking <strong>MTG-${bookingId}</strong> has been marked as Completed!
+      Dear <strong>${esc(clientName || 'Valued Customer')}</strong>,<br>
+      Your detailing treatment <strong>${esc(serviceName || 'Car Wash Package')}</strong> for booking <strong>MTG-${bookingId}</strong> has been marked as Completed!
     </p>
 
     ${renderRefCard({ bookingId, invoiceId, clientName })}
@@ -443,7 +454,7 @@ const sendAdminCompleteBookingEmail = async ({ to, clientName, bookingId, invoic
 const sendWalkInBookingEmail = async ({ to, clientName, bookingId, invoiceId, serviceName, scheduledDate, timeSlot, price }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Hello <strong>${clientName || 'Walk-In Customer'}</strong>,<br>
+      Hello <strong>${esc(clientName || 'Walk-In Customer')}</strong>,<br>
       Your studio walk-in appointment has been logged at our Banilad counter.
     </p>
 
@@ -452,7 +463,7 @@ const sendWalkInBookingEmail = async ({ to, clientName, bookingId, invoiceId, se
     <div style="background-color:#F8F9FA; border:1px solid #E5E5E5; padding:18px; border-radius:12px; margin:20px 0; font-size:13px; line-height:1.6;">
       <strong>Scheduled Date:</strong> ${scheduledDate || 'Today'}<br>
       <strong>Time Slot:</strong> ${timeSlot || 'Immediate Counter'}<br>
-      <strong>Treatment:</strong> ${serviceName || 'Walk-In Detailing'}<br>
+      <strong>Treatment:</strong> ${esc(serviceName || 'Walk-In Detailing')}<br>
       <strong>Total Invoiced:</strong> ₱${parseFloat(price || 0).toFixed(2)}
     </div>
   `;
@@ -476,7 +487,7 @@ const sendWalkInBookingEmail = async ({ to, clientName, bookingId, invoiceId, se
 const sendMonthlySubscriptionPaymentEmail = async ({ to, clientName, subscriptionId, invoiceId, amount = '1,500', nextBillingDate }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'VIP Member'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'VIP Member')}</strong>,<br>
       Your monthly renewal payment of ₱${amount}.00 for Unlimited VIP Wash Club membership was processed successfully.
     </p>
 
@@ -508,7 +519,7 @@ const sendMonthlySubscriptionPaymentEmail = async ({ to, clientName, subscriptio
 const sendSubscriptionCancelledEmail = async ({ to, clientName, subscriptionId }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Dear <strong>${clientName || 'VIP Member'}</strong>,<br>
+      Dear <strong>${esc(clientName || 'VIP Member')}</strong>,<br>
       Your Unlimited VIP Wash Club subscription (ID: SUB-${subscriptionId || 'VIP'}) has been cancelled as requested.
     </p>
 
@@ -536,7 +547,7 @@ const sendSubscriptionCancelledEmail = async ({ to, clientName, subscriptionId }
 const sendSubscriptionReactivatedEmail = async ({ to, clientName, subscriptionId, nextBillingDate }) => {
   const contentHtml = `
     <p style="font-size:14px; margin:0 0 16px 0; line-height:1.6; color:#333333;">
-      Welcome back, <strong>${clientName || 'VIP Member'}</strong>!<br>
+      Welcome back, <strong>${esc(clientName || 'VIP Member')}</strong>!<br>
       Your Unlimited VIP Wash Club subscription (ID: SUB-${subscriptionId || 'VIP'}) is now reactivated and active.
     </p>
 

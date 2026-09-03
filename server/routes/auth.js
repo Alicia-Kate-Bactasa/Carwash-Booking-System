@@ -11,28 +11,25 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const prisma = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
-
-// Environment secret configuration check
-const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
-}
+const { sendOtpEmail } = require('../services/mailer');
+const { JWT_SECRET } = require('../config');
 
 /**
  * Safely parses request body data supporting both object and JSON string formats.
  */
 const getBodyData = (req) => {
-
   let body = req.body;
   if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch(e){}
+    try { body = JSON.parse(body); } catch (e) { /* ignore malformed body */ }
   }
   return body || {};
 };
 
 /**
  * Helper to initiate pre-registration checkout for ₱1,500 VIP Membership.
- * Stores payload temporarily in userSecurityAction WITHOUT creating User, Customer, Subscription, or Invoice records.
+ * Stores payload temporarily in a server-side PendingRegistration record
+ * WITHOUT creating User, Customer, Subscription, or Invoice records.
+ * The checkout redirect carries only an opaque random token (no password hash).
  * Database records are created ONLY upon payment verification via /payments/verify.
  */
 const handlePreRegistration = async (req, res) => {
@@ -46,7 +43,7 @@ const handlePreRegistration = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ status: 'error', message: 'Email address and password are required.' });
     }
-    if (password.length < 6) {
+    if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ status: 'error', message: 'Password must be at least 6 characters long.' });
     }
 
@@ -62,34 +59,22 @@ const handlePreRegistration = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const username = full_name ? full_name.trim() : cleanEmail.split('@')[0];
 
-    // Create a secure temporary registration JWT token (valid for 2 hours)
-    const regToken = jwt.sign(
-      {
+    // Create an opaque, random registration token. The password hash is stored
+    // server-side in PendingRegistration rather than embedded in a URL so it is
+    // never exposed in query strings / proxy / browser logs.
+    const regToken = crypto.randomBytes(32).toString('hex');
+
+    await prisma.pendingRegistration.create({
+      data: {
+        token: regToken,
         email: cleanEmail,
         username,
         full_name: username,
         phone_number: phone_number ? phone_number.trim() : 'N/A',
-        hashedPassword
-      },
-      JWT_SECRET,
-      { expiresIn: '2h' }
-    );
-
-    // Request PayMongo Hosted Checkout Session for ₱1,500 VIP Membership
-    const path = require('path');
-    const fs = require('fs');
-    const dotenv = require('dotenv');
-    const envPaths = [
-      path.join(__dirname, '../.env'),
-      path.join(__dirname, '../../.env'),
-      path.join(process.cwd(), 'server/.env'),
-      path.join(process.cwd(), '.env')
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        dotenv.config({ path: envPath, override: true });
+        password_hash: hashedPassword,
+        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000)
       }
-    }
+    });
 
     const rawKey = process.env.PAYMONGO_SECRET_KEY || '';
     const paymongoKey = rawKey.trim();
@@ -98,8 +83,8 @@ const handlePreRegistration = async (req, res) => {
     const successUrl = `${cleanReturnUrl}?payment=success&reg_token=${regToken}`;
     const cancelUrl = `${cleanReturnUrl}?payment=cancel`;
 
-    const isRealPaymongoKey = paymongoKey && 
-      (paymongoKey.startsWith('sk_test_') || paymongoKey.startsWith('sk_live_')) && 
+    const isRealPaymongoKey = paymongoKey &&
+      (paymongoKey.startsWith('sk_test_') || paymongoKey.startsWith('sk_live_')) &&
       !paymongoKey.includes('your_paymongo_secret_key');
 
     if (isRealPaymongoKey) {
@@ -156,20 +141,12 @@ const handlePreRegistration = async (req, res) => {
   }
 };
 
-/**
- * POST /api/v1/auth/pre-register
- */
 router.post('/pre-register', handlePreRegistration);
-
-/**
- * POST /api/v1/auth/register or /api/auth/register
- * Initiate registration checkout (no DB records created until payment verification)
- */
 router.post('/register', handlePreRegistration);
 
 /**
- * POST /api/v1/auth/login or /api/auth/login
- * Log in to member account
+ * POST /api/v1/auth/login
+ * Log in to member account (credentials verified strictly against stored password hashes).
  */
 router.post('/login', async (req, res) => {
   try {
@@ -186,36 +163,11 @@ router.post('/login', async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Safely attempt database lookup for user profile
-    let user = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { email: cleanEmail }
-      });
-    } catch (dbLookupError) {
-      console.error('Login Database Lookup Error:', dbLookupError.message);
-    }
+    const user = await prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
 
-    // Auto-seed or fallback default Admin user if logging in as admin@montage.com or admin@montage.ph
-    if (!user && (cleanEmail === 'admin@montage.com' || cleanEmail === 'admin@montage.ph')) {
-      const hashedPassword = await bcrypt.hash(password || 'admin123', 10);
-      user = await prisma.user.create({
-        data: {
-          email: cleanEmail,
-          username: 'Studio Administrator',
-          password: hashedPassword,
-          role: 'Admin'
-        }
-      }).catch(() => ({
-        user_id: 1,
-        email: cleanEmail,
-        username: 'Studio Administrator',
-        password: hashedPassword,
-        role: 'Admin'
-      }));
-    }
-
-    if (!user && !(cleanEmail === 'admin@montage.com' || cleanEmail === 'admin@montage.ph')) {
+    if (!user || !user.password) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid email address or password.'
@@ -224,30 +176,16 @@ router.post('/login', async (req, res) => {
 
     // Verify password hash using bcrypt (supporting legacy $2y$ PHP hashes)
     let isPasswordValid = false;
-    if (user && user.password) {
-      try {
-        const normalizedHash = user.password.startsWith('$2y$')
-          ? user.password.replace(/^\$2y\$/, '$2a$')
-          : user.password;
-        isPasswordValid = await bcrypt.compare(password, normalizedHash);
-      } catch (e) {
-        isPasswordValid = false;
-      }
+    try {
+      const normalizedHash = user.password.startsWith('$2y$')
+        ? user.password.replace(/^\$2y\$/, '$2a$')
+        : user.password;
+      isPasswordValid = await bcrypt.compare(password, normalizedHash);
+    } catch (e) {
+      isPasswordValid = false;
     }
 
-    // Direct fallback & hash upgrade for default Admin account (admin@montage.com / admin123)
-    if (!isPasswordValid && (cleanEmail === 'admin@montage.com' || cleanEmail === 'admin@montage.ph' || (user && user.role === 'Admin')) && password === 'admin123') {
-      isPasswordValid = true;
-      if (user && user.user_id && user.user_id !== 1) {
-        const newHash = await bcrypt.hash('admin123', 10);
-        await prisma.user.update({
-          where: { user_id: user.user_id },
-          data: { password: newHash }
-        }).catch(() => {});
-      }
-    }
-
-    if (!user || !isPasswordValid) {
+    if (!isPasswordValid) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid email address or password.'
@@ -256,7 +194,7 @@ router.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.user_id || 1, email: user.email || cleanEmail, role: user.role || 'Admin' },
+      { userId: user.user_id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -266,33 +204,23 @@ router.post('/login', async (req, res) => {
       message: 'Login successful.',
       token,
       user: {
-        user_id: user.user_id || 1,
-        email: user.email || cleanEmail,
-        full_name: user.username || 'Studio Administrator',
-        role: user.role || 'Admin'
+        user_id: user.user_id,
+        email: user.email,
+        full_name: user.username,
+        role: user.role
       }
     });
   } catch (error) {
     console.error('Login Error:', error);
-    const isDbError = error.message && (
-      error.message.includes('Authentication failed') ||
-      error.message.includes('Prisma') ||
-      error.message.includes('database server') ||
-      error.message.includes('Can\'t reach') ||
-      error.message.includes('ConnectorError') ||
-      error.message.includes('ep-curly-unit')
-    );
     return res.status(500).json({
       status: 'error',
-      message: isDbError 
-        ? 'Database connection is currently unavailable. Please try again in a few moments.' 
-        : 'Failed to log in. Please try again.'
+      message: 'Failed to log in. Please try again.'
     });
   }
 });
 
 /**
- * GET /api/v1/auth/me or /api/auth/me
+ * GET /api/v1/auth/me
  * Get current authenticated user profile
  */
 router.get('/me', requireAuth, async (req, res) => {
@@ -326,8 +254,6 @@ router.get('/me', requireAuth, async (req, res) => {
     });
   }
 });
-
-const { sendOtpEmail } = require('../services/mailer');
 
 /**
  * POST /api/v1/auth/forgot-password
@@ -417,7 +343,8 @@ router.post('/verify-otp', async (req, res) => {
 
 /**
  * POST /api/v1/auth/reset-password
- * Resets user password using verified 6-digit OTP code
+ * Resets user password ONLY after the 6-digit OTP has been verified.
+ * Requires email, the verified OTP, and a new password.
  */
 router.post('/reset-password', async (req, res) => {
   try {
@@ -426,12 +353,27 @@ router.post('/reset-password', async (req, res) => {
     const otp = (body.otp || body.token || '').trim();
     const newPassword = body.newPassword || body.password;
 
-    if (!email || !newPassword) {
-      return res.status(400).json({ status: 'error', message: 'Email and new password are required.' });
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ status: 'error', message: 'Email, OTP code and new password are required.' });
     }
 
-    if (newPassword.length < 6) {
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
       return res.status(400).json({ status: 'error', message: 'Password must be at least 6 characters long.' });
+    }
+
+    // Require a valid, non-expired OTP before allowing the reset
+    const action = await prisma.userSecurityAction.findFirst({
+      where: {
+        identifier: email,
+        token: otp,
+        action_type: 'password_reset',
+        expires_at: { gte: new Date() }
+      },
+      orderBy: { action_id: 'desc' }
+    });
+
+    if (!action) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired verification code. Please request a new code.' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
@@ -446,7 +388,7 @@ router.post('/reset-password', async (req, res) => {
       data: { password: hashedPassword }
     });
 
-    // Delete used security action
+    // Invalidate all used security actions for this email
     await prisma.userSecurityAction.deleteMany({ where: { identifier: email, action_type: 'password_reset' } }).catch(() => {});
 
     return res.status(200).json({

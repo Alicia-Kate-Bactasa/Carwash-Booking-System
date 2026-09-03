@@ -6,36 +6,14 @@
 
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'montage_studio_jwt_secret_key_2026';
-
-/**
- * Extracts and verifies the email from the Bearer token (uses the SAME secret as auth).
- */
-const getEmailFromAuth = (req) => {
-  if (req.user?.email) return req.user.email.trim().toLowerCase();
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const tokenStr = authHeader.split(' ')[1];
-      if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined') {
-        const decoded = jwt.verify(tokenStr, JWT_SECRET);
-        if (decoded && decoded.email) return decoded.email.trim().toLowerCase();
-      }
-    } catch (e) {}
-  }
-  return null;
-};
 
 /**
  * GET /api/v1/subscriptions
  * Retrieves all subscriber accounts for admin monitoring.
  */
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
-
   try {
     const { status } = req.query;
     const where = {};
@@ -64,11 +42,11 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/v1/subscriptions/me
- * Get current subscriber status & subscription details
+ * Get current subscriber status & subscription details (requires authentication)
  */
-router.get('/me', async (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   try {
-    const email = getEmailFromAuth(req);
+    const email = req.user.email.trim().toLowerCase();
 
     let user = null;
     if (email && email.length > 3) {
@@ -93,11 +71,9 @@ router.get('/me', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching subscription profile:', error);
-    return res.status(200).json({
-      status: 'success',
-      data: {
-        subscription: null
-      }
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to retrieve subscription profile.'
     });
   }
 });
@@ -140,7 +116,6 @@ router.post('/renew', requireAuth, async (req, res) => {
         });
       }
 
-      // Create linked Monthly Roster invoice
       const invoice = await tx.invoice.create({
         data: {
           subscription_id: sub.subscription_id,
@@ -166,25 +141,31 @@ router.post('/renew', requireAuth, async (req, res) => {
 
 /**
  * POST /api/v1/subscriptions/cancel
- * Cancel active subscription and dispatch cancellation email notification
+ * Cancel an active subscription. Users cancel their own account; admins may cancel any account.
  */
-router.post('/cancel', async (req, res) => {
+router.post('/cancel', requireAuth, async (req, res) => {
   try {
-    const requestedEmail = (req.body?.email || '').trim().toLowerCase();
-    const email = requestedEmail || getEmailFromAuth(req);
+    const requesterEmail = req.user.email.trim().toLowerCase();
+    const isAdmin = req.user.role === 'Admin';
+    // Non-admin users may only cancel their own subscription
+    const requestedEmail = isAdmin && req.body?.email
+      ? String(req.body.email).trim().toLowerCase()
+      : requesterEmail;
 
-    let user = null;
-    if (email && email.length > 3) {
-      user = await prisma.user.findUnique({ where: { email } }).catch(() => null);
+    // Account must exist to be cancelled
+    const user = await prisma.user.findUnique({ where: { email: requestedEmail } });
+    if (!user) {
+      return res.status(404).json({ status: 'error', message: 'User not found.' });
     }
 
-    let sub = null;
-    if (user) {
-      sub = await prisma.subscription.findFirst({
-        where: { user_id: user.user_id },
-        orderBy: { subscription_id: 'desc' }
-      }).catch(() => null);
+    if (!isAdmin && user.email.toLowerCase() !== requesterEmail) {
+      return res.status(403).json({ status: 'error', message: 'You may only cancel your own subscription.' });
     }
+
+    const sub = await prisma.subscription.findFirst({
+      where: { user_id: user.user_id },
+      orderBy: { subscription_id: 'desc' }
+    });
 
     if (sub && sub.subscription_id) {
       await prisma.subscription.update({
@@ -193,11 +174,10 @@ router.post('/cancel', async (req, res) => {
       }).catch(() => {});
     }
 
-    const recipientEmail = email || user?.email;
-    if (recipientEmail && recipientEmail.includes('@')) {
+    if (requestedEmail.includes('@')) {
       const { sendSubscriptionCancelledEmail } = require('../services/mailer');
       sendSubscriptionCancelledEmail({
-        to: recipientEmail,
+        to: requestedEmail,
         clientName: user?.username || 'VIP Member',
         subscriptionId: sub?.subscription_id || 1
       }).catch(e => console.error('Subscription Cancelled Email Error:', e));
@@ -219,36 +199,40 @@ router.post('/cancel', async (req, res) => {
 
 /**
  * POST /api/v1/subscriptions/reactivate
- * Reactivate subscription and dispatch reactivation email notification
+ * Reactivate a subscription. Users reactivate their own account; admins may reactivate any account.
  */
-router.post('/reactivate', async (req, res) => {
+router.post('/reactivate', requireAuth, async (req, res) => {
   try {
-    const requestedEmail = (req.body?.email || '').trim().toLowerCase();
-    const email = requestedEmail || getEmailFromAuth(req);
+    const requesterEmail = req.user.email.trim().toLowerCase();
+    const isAdmin = req.user.role === 'Admin';
+    const requestedEmail = isAdmin && req.body?.email
+      ? String(req.body.email).trim().toLowerCase()
+      : requesterEmail;
 
-    let user = null;
-    if (email && email.length > 3) {
-      user = await prisma.user.findUnique({ where: { email } }).catch(() => null);
+    const user = await prisma.user.findUnique({ where: { email: requestedEmail } });
+    if (!user) {
+      return res.status(404).json({ status: 'error', message: 'User not found.' });
+    }
+
+    if (!isAdmin && user.email.toLowerCase() !== requesterEmail) {
+      return res.status(403).json({ status: 'error', message: 'You may only reactivate your own subscription.' });
     }
 
     const today = new Date();
     const nextMonth = new Date();
     nextMonth.setMonth(today.getMonth() + 1);
 
-    let sub = null;
-    if (user) {
-      sub = await prisma.subscription.findFirst({
-        where: { user_id: user.user_id },
-        orderBy: { subscription_id: 'desc' }
-      }).catch(() => null);
-    }
+    let sub = await prisma.subscription.findFirst({
+      where: { user_id: user.user_id },
+      orderBy: { subscription_id: 'desc' }
+    });
 
     if (sub && sub.subscription_id) {
       sub = await prisma.subscription.update({
         where: { subscription_id: sub.subscription_id },
         data: { plan_status: 'Active', last_billing_date: today, next_billing_date: nextMonth }
       }).catch(() => sub);
-    } else if (user) {
+    } else {
       sub = await prisma.subscription.create({
         data: {
           user_id: user.user_id,
@@ -260,11 +244,10 @@ router.post('/reactivate', async (req, res) => {
       }).catch(() => null);
     }
 
-    const recipientEmail = email || user?.email;
-    if (recipientEmail && recipientEmail.includes('@')) {
+    if (requestedEmail.includes('@')) {
       const { sendSubscriptionReactivatedEmail } = require('../services/mailer');
       sendSubscriptionReactivatedEmail({
-        to: recipientEmail,
+        to: requestedEmail,
         clientName: user?.username || 'VIP Member',
         subscriptionId: sub?.subscription_id || 1,
         nextBillingDate: nextMonth.toISOString().split('T')[0]

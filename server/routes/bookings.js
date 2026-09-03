@@ -7,8 +7,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
+const jwt = require('jsonwebtoken');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { JWT_SECRET } = require('../config');
 const { z } = require('zod');
 
 // Zod validation schema for booking creation payload
@@ -21,10 +23,27 @@ const createBookingSchema = z.object({
     // Optional guest details if not signed in as a registered subscriber
     full_name: z.string().optional(),
     phone_number: z.string().optional(),
-    email: z.string().email().optional(),
-    user_id: z.number().int().optional()
+    email: z.string().email().optional()
   })
 });
+
+/**
+ * Optionally authenticates the requester from a Bearer token, returning the
+ * decoded user claims or null when no valid token is present. Guest bookings
+ * never trust a client-supplied user_id; subscriber benefits are only granted
+ * to the authenticated account.
+ */
+const getOptionalUser = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    if (decoded && decoded.userId) {
+      return { id: decoded.userId, email: decoded.email, role: decoded.role };
+    }
+  } catch (e) { /* invalid token -> treat as guest */ }
+  return null;
+};
 
 
 /**
@@ -84,6 +103,13 @@ router.post('/member', requireAuth, async (req, res) => {
     const activeSub = await prisma.subscription.findFirst({
       where: { user_id: dbUser.user_id, plan_status: 'Active' }
     });
+
+    if (!activeSub) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'An active VIP subscription is required to reserve this appointment.'
+      });
+    }
 
     const service = await prisma.service.findUnique({ where: { service_id: serviceId } });
     if (!service || !service.is_active) {
@@ -151,16 +177,12 @@ router.get('/', requireAuth, async (req, res) => {
 
     // Filter by user role unless admin requesting all
     if (req.user.role !== 'Admin') {
-      const dbUser = await prisma.user.upsert({
-        where: { email: req.user.email },
-        update: {},
-        create: {
-          email: req.user.email,
-          username: req.user.email.split('@')[0] + '-' + Date.now().toString(36),
-          password: 'managed_account',
-          role: 'Subscriber'
-        }
-      });
+      const dbUser = await prisma.user.findUnique({ where: { email: req.user.email } });
+      if (!dbUser) {
+        // Authenticated but no matching account: return empty list rather than
+        // silently creating a managed account as a read side-effect.
+        return res.status(200).json({ status: 'success', data: [] });
+      }
       where.user_id = dbUser.user_id;
     }
 
@@ -244,7 +266,8 @@ router.get('/availability', async (req, res) => {
  */
 router.post('/', validate(createBookingSchema), async (req, res) => {
   try {
-    const { service_id, scheduled_date, time_slot, bay_number, full_name, phone_number, email, user_id } = req.validated.body;
+    const { service_id, scheduled_date, time_slot, bay_number, full_name, phone_number, email } = req.validated.body;
+    const authUser = getOptionalUser(req);
 
     // 1. Fetch requested service
     const service = await prisma.service.findUnique({
@@ -272,24 +295,27 @@ router.post('/', validate(createBookingSchema), async (req, res) => {
       });
     }
 
-    // 3. Determine Subscriber vs Guest Status
-    let targetUserId = user_id || null;
+    // 3. Determine Subscriber vs Guest Status (from authenticated token only)
+    let targetUserId = null;
     let targetCustomerId = null;
     let isSubscriber = false;
     let subscriptionId = null;
 
-    if (targetUserId) {
+    if (authUser) {
       const activeSub = await prisma.subscription.findFirst({
         where: {
-          user_id: targetUserId,
+          user_id: authUser.id,
           plan_status: 'Active'
         }
       });
       if (activeSub) {
         isSubscriber = true;
         subscriptionId = activeSub.subscription_id;
+        targetUserId = authUser.id;
       }
-    } else if (email && full_name) {
+    }
+
+    if (!targetUserId && email && full_name) {
       // Find or create customer
       let customer = await prisma.customer.findFirst({
         where: { email }

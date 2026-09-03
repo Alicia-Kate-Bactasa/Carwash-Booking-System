@@ -1,6 +1,8 @@
 <!--
   Reset Password View Component for Montage Auto Studio.
-  Form view for choosing a new password after successful identity verification.
+  Form view for choosing a new password after a successfully verified OTP.
+  Reads the verified email + OTP from session storage (set by ForgotPasswordView)
+  and redirects to the forgot-password flow when they are not present.
 -->
 <template>
   <div class="bg-light text-dark font-sans antialiased flex items-center justify-center min-h-screen selection:bg-dark selection:text-light">
@@ -79,10 +81,9 @@
 </template>
 
 <script setup>
-// Password reset form submission and route redirection to login
-import { ref } from 'vue';
+// Password reset form submission, secure OTP-gated reset, and route redirection
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-
 
 const router = useRouter();
 const newPassword = ref('');
@@ -92,6 +93,13 @@ const showConfirmPassword = ref(false);
 const loading = ref(false);
 const statusMsg = ref('');
 const isSuccess = ref(false);
+
+onMounted(() => {
+  // Require a verified OTP session before allowing a password change
+  if (!sessionStorage.getItem('reset_otp')) {
+    router.replace('/forgot-password');
+  }
+});
 
 const handleResetPassword = async () => {
   if (newPassword.value.length < 6) {
@@ -105,26 +113,37 @@ const handleResetPassword = async () => {
     return;
   }
 
+  const email = sessionStorage.getItem('reset_email');
+  const otp = sessionStorage.getItem('reset_otp');
+  if (!email || !otp) {
+    statusMsg.value = 'Session expired. Please restart the password reset process.';
+    isSuccess.value = false;
+    return;
+  }
+
   loading.value = true;
   statusMsg.value = '';
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    await fetch(`${apiBase}/auth/reset-password`, {
+    const res = await fetch(`${apiBase}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: newPassword.value })
+      body: JSON.stringify({ email, otp, newPassword: newPassword.value })
     });
-    statusMsg.value = 'Password reset successfully! Redirecting to login...';
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to update password.');
+    }
+    sessionStorage.removeItem('reset_email');
+    sessionStorage.removeItem('reset_otp');
+    statusMsg.value = 'Password updated successfully! Redirecting to login...';
     isSuccess.value = true;
     setTimeout(() => {
       router.push('/');
     }, 1500);
   } catch (err) {
-    statusMsg.value = 'Password reset successfully! Redirecting to login...';
-    isSuccess.value = true;
-    setTimeout(() => {
-      router.push('/');
-    }, 1500);
+    statusMsg.value = err.message || 'Failed to update password.';
+    isSuccess.value = false;
   } finally {
     loading.value = false;
   }
