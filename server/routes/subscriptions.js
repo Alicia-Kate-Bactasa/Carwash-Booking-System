@@ -106,13 +106,13 @@ router.post('/renew', requireAuth, async (req, res) => {
           data: {
             user_id: dbUser.user_id,
             plan_tier: tierName,
-            plan_status: 'Inactive'
+            plan_status: 'Payment_Pending'
           }
         });
       } else {
         await tx.subscription.update({
           where: { subscription_id: sub.subscription_id },
-          data: { plan_status: 'Inactive', plan_tier: tierName }
+          data: { plan_status: 'Payment_Pending', plan_tier: tierName }
         });
       }
 
@@ -121,7 +121,7 @@ router.post('/renew', requireAuth, async (req, res) => {
           subscription_id: sub.subscription_id,
           total_amount: renewalAmount,
           invoice_type: 'Monthly_Roster',
-          invoice_status: 'Inactive'
+          invoice_status: 'Pending'
         }
       });
 
