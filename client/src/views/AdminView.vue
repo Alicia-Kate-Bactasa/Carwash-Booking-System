@@ -1140,7 +1140,7 @@ const loadSubscribers = async () => {
 const loadFeedbacks = async () => {
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
-    const res = await fetch(`${apiBase}/feedbacks`, { headers: getAuthHeaders(false) });
+    const res = await fetch(`${apiBase}/feedback`, { headers: getAuthHeaders(false) });
     if (res.ok) {
       const json = await res.json().catch(() => ({}));
       const data = extractList(json);
