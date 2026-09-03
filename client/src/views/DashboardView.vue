@@ -414,7 +414,7 @@
 
 <script setup>
 // Script setup for managing member workspace state, active appointments, ₱0.00 booking calculations, and subscription status
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ServiceSelector from '@/components/ServiceSelector.vue';
 import RescheduleModal from '@/components/RescheduleModal.vue';
@@ -890,10 +890,27 @@ const logout = async () => {
   router.push('/');
 };
 
-onMounted(() => {
+let pollInterval = null;
+
+const refreshAllData = () => {
   loadAppointments();
   fetchCatalogServices();
   fetchSubscriptionDetails();
+};
+
+onMounted(() => {
+  refreshAllData();
   checkPaymentRedirect();
+
+  // Auto-refresh data when user switches back to tab
+  window.addEventListener('focus', refreshAllData);
+
+  // Poll for updates every 10 seconds for live on-spot rendering
+  pollInterval = setInterval(refreshAllData, 10000);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('focus', refreshAllData);
+  if (pollInterval) clearInterval(pollInterval);
 });
 </script>

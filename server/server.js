@@ -26,6 +26,12 @@ const API_PREFIX = '/api/v1';
 app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// Disable browser caching for API requests so state updates render live on spot
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 // Cors configuration. In development localhost origins are allowed; in
 // production only explicitly configured origins are accepted. Credentials are
 // only allowed alongside a matching origin.

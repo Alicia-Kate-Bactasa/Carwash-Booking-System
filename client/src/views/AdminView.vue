@@ -493,7 +493,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import GlobalErrorModal from '@/components/GlobalErrorModal.vue';
 
 const isSidebarCollapsed = ref(false);
@@ -794,11 +794,28 @@ const saveService = async () => {
   }
 };
 
-onMounted(() => {
+let pollInterval = null;
+
+const refreshAllAdminData = () => {
   loadBookings();
   loadInvoices();
   loadServices();
   loadSubscribers();
   loadFeedbacks();
+};
+
+onMounted(() => {
+  refreshAllAdminData();
+
+  // Auto-refresh admin view when switching back to tab
+  window.addEventListener('focus', refreshAllAdminData);
+
+  // Poll for updates every 10 seconds for live on-spot rendering
+  pollInterval = setInterval(refreshAllAdminData, 10000);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('focus', refreshAllAdminData);
+  if (pollInterval) clearInterval(pollInterval);
 });
 </script>
