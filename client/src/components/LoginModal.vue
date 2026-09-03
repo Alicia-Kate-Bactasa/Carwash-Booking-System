@@ -54,9 +54,9 @@
         </div>
 
         <!-- Sliding Forms Viewport Container -->
-        <div class="overflow-hidden relative min-h-[350px]">
+        <div class="overflow-hidden relative">
           <div 
-            class="flex transition-transform duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] w-[200%]"
+            class="flex transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] w-[200%] items-start"
             :style="{ transform: isRegister ? 'translateX(-50%)' : 'translateX(0%)' }"
           >
             <!-- Form: Login Mode (Left Slide) -->
