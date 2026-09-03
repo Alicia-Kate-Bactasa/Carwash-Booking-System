@@ -19,7 +19,7 @@ Montage Auto Studio is a full-stack auto detailing reservation and VIP membershi
 ### Backend & Database
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 ![Prisma ORM](https://img.shields.io/badge/Prisma_ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white)
 ![Nodemailer](https://img.shields.io/badge/Nodemailer-0298C3?style=for-the-badge&logo=gmail&logoColor=white)
 ![PayMongo API](https://img.shields.io/badge/PayMongo_API-0052FF?style=for-the-badge&logo=contactlesspayment&logoColor=white)
