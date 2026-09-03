@@ -724,9 +724,13 @@ const submitMemberBooking = async () => {
   bookingLoading.value = true;
   try {
     const apiBase = window.API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('auth_token');
     const res = await fetch(`${apiBase}/bookings/member`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({
         service_id: parseInt(bookingForm.value.serviceId, 10),
         scheduled_date: bookingForm.value.date,
