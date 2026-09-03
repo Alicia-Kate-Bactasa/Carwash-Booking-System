@@ -345,6 +345,12 @@
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                 <div>
+                  <span class="text-xs text-neutral-400 font-semibold uppercase tracking-wider block mb-1">Subscription ID</span>
+                  <span class="font-bold text-dark font-mono text-sm bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200 inline-block">
+                    SUB-{{ subscriptionDetails.subscription_id || 'N/A' }}
+                  </span>
+                </div>
+                <div>
                   <span class="text-xs text-neutral-400 font-semibold uppercase tracking-wider block mb-1">Account Holder</span>
                   <span class="font-bold text-dark text-base">{{ welcomeName }}</span>
                 </div>
@@ -678,6 +684,7 @@ const fetchSubscriptionDetails = async () => {
         localStorage.setItem('subscriber_plan_status', statusFromDb);
 
         subscriptionDetails.value = {
+          subscription_id: sub.subscription_id || null,
           plan_status: statusFromDb,
           created_at: sub.created_at ? String(sub.created_at).split('T')[0] : new Date().toISOString().split('T')[0],
           last_billing_date: sub.last_billing_date ? String(sub.last_billing_date).split('T')[0] : new Date().toISOString().split('T')[0],

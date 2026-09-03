@@ -19,7 +19,12 @@
           <span :class="['font-black px-3 py-0.5 rounded-full text-[10px]', isVip ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-dark']">
             {{ isVip ? 'VIP FREE' : '₱' + (selectedServiceObj.service_price || selectedServiceObj.price) + '.00' }}
           </span>
-          <span class="text-[10px] text-neutral-400 font-medium">⏱️ {{ formatDuration(selectedServiceObj.service_duration || selectedServiceObj.duration) }}</span>
+          <span class="text-[10px] text-neutral-400 font-medium flex items-center gap-1">
+            <svg class="w-3 h-3 text-neutral-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {{ formatDuration(selectedServiceObj.service_duration || selectedServiceObj.duration) }}
+          </span>
         </div>
       </template>
       <template v-else>
@@ -64,11 +69,16 @@
         </div>
 
         <div class="flex items-center gap-2.5 shrink-0">
-          <span :class="['text-[10px] font-bold', isSelected(s) ? 'text-neutral-300' : 'text-neutral-400']">
-            ⏱️ {{ formatDuration(s.service_duration || s.duration) }}
+          <span :class="['text-[10px] font-bold flex items-center gap-1', isSelected(s) ? 'text-neutral-300' : 'text-neutral-400']">
+            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {{ formatDuration(s.service_duration || s.duration) }}
           </span>
           <div :class="['w-5 h-5 rounded-full flex items-center justify-center border text-[10px] font-bold', isSelected(s) ? 'bg-white text-dark border-white' : 'border-neutral-300 text-transparent']">
-            ✓
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
           </div>
         </div>
       </div>

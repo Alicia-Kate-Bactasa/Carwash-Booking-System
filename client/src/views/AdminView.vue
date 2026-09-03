@@ -228,6 +228,29 @@
             </div>
           </div>
 
+          <!-- Payments Ledger Filter Controls -->
+          <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm">
+            <div class="relative w-full sm:w-80">
+              <input 
+                v-model="paymentSearchQuery" 
+                type="text" 
+                placeholder="Search Invoice ID (INV-), Booking ID (MTG-), or Date..." 
+                class="w-full bg-neutral-50 border border-neutral-200 pl-10 pr-4 py-2.5 rounded-full text-xs font-medium focus:outline-none focus:border-black"
+              />
+              <svg class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <span class="text-xs font-bold uppercase tracking-wider text-neutral-400">Payment Type:</span>
+              <select v-model="paymentTypeFilter" class="bg-neutral-50 border border-neutral-200 px-4 py-2.5 rounded-full text-xs font-bold uppercase focus:outline-none focus:border-black">
+                <option value="all">All Invoices</option>
+                <option value="Single_Detailing">Single Detailing</option>
+                <option value="Monthly_Roster">VIP Membership Renewal</option>
+              </select>
+            </div>
+          </div>
+
           <div v-motion-fade-visible-once class="bg-white border border-neutral-200 rounded-[2rem] overflow-hidden shadow-sm">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm border-collapse">
@@ -242,10 +265,10 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 font-medium text-neutral-700 text-xs">
-                  <tr v-if="invoices.length === 0">
-                    <td colspan="6" class="p-8 text-center text-neutral-400 font-mono">No verified payment records found.</td>
+                  <tr v-if="filteredInvoices.length === 0">
+                    <td colspan="6" class="p-8 text-center text-neutral-400 font-mono">No matching payment ledger records found.</td>
                   </tr>
-                  <tr v-for="inv in invoices" :key="inv.invoice_id" class="hover:bg-neutral-50">
+                  <tr v-for="inv in filteredInvoices" :key="inv.invoice_id" class="hover:bg-neutral-50">
                     <td class="p-5 font-mono font-bold text-black">INV-{{ inv.invoice_id }}</td>
                     <td class="p-5 font-mono font-bold text-neutral-800">
                       {{ inv.booking_id ? ('MTG-' + inv.booking_id) : (inv.booking?.booking_id ? ('MTG-' + inv.booking.booking_id) : '—') }}
@@ -297,7 +320,12 @@
               <p class="text-xs text-neutral-500 font-medium leading-relaxed">{{ s.service_description || 'No description provided.' }}</p>
               
               <div class="pt-3 border-t border-neutral-100 flex items-center justify-between">
-                <span class="text-[11px] font-bold text-neutral-600">⏱️ {{ formatDuration(s.service_duration) }}</span>
+                <span class="text-[11px] font-bold text-neutral-600 flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 text-neutral-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {{ formatDuration(s.service_duration) }}
+                </span>
                 <div class="flex items-center gap-2">
                   <button 
                     @click="openEditServiceModal(s)"
@@ -319,9 +347,36 @@
 
         <!-- TAB: SUBSCRIPTIONS -->
         <section v-else-if="activeTab === 'monitoring'" key="monitoring" class="space-y-8">
-          <div class="border-b border-neutral-200 pb-6">
-            <h2 class="text-3xl font-bold tracking-tight text-black">Subscription Control</h2>
-            <p class="text-neutral-500 text-sm mt-2">Manage member accounts and subscriptions roster.</p>
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-neutral-200 pb-6 gap-4">
+            <div>
+              <h2 class="text-3xl font-bold tracking-tight text-black">Subscription Control</h2>
+              <p class="text-neutral-500 text-sm mt-2">Manage member accounts and subscriptions roster.</p>
+            </div>
+          </div>
+
+          <!-- Subscription Control Filter Controls -->
+          <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm">
+            <div class="relative w-full sm:w-80">
+              <input 
+                v-model="subSearchQuery" 
+                type="text" 
+                placeholder="Search SUB-ID, Subscriber Name, or Email..." 
+                class="w-full bg-neutral-50 border border-neutral-200 pl-10 pr-4 py-2.5 rounded-full text-xs font-medium focus:outline-none focus:border-black"
+              />
+              <svg class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <span class="text-xs font-bold uppercase tracking-wider text-neutral-400">Plan Status:</span>
+              <select v-model="subStatusFilter" class="bg-neutral-50 border border-neutral-200 px-4 py-2.5 rounded-full text-xs font-bold uppercase focus:outline-none focus:border-black">
+                <option value="all">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Payment_Pending">Payment Pending</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
           </div>
 
           <div v-motion-fade-visible-once class="bg-white border border-neutral-200 rounded-[2rem] overflow-hidden shadow-sm">
@@ -329,16 +384,22 @@
               <table class="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr class="border-b border-neutral-200 bg-neutral-50 font-bold text-neutral-400 uppercase tracking-wider text-[11px]">
+                    <th class="p-5">Subscription ID</th>
                     <th class="p-5">Subscriber Name</th>
                     <th class="p-5">Plan Tier</th>
                     <th class="p-5 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-xs">
-                  <tr v-if="subscribers.length === 0">
-                    <td colspan="3" class="p-8 text-center text-neutral-400 font-mono">No VIP subscriber accounts found.</td>
+                  <tr v-if="filteredSubscribers.length === 0">
+                    <td colspan="4" class="p-8 text-center text-neutral-400 font-mono">No matching VIP subscriber accounts found.</td>
                   </tr>
-                  <tr v-for="sub in subscribers" :key="sub.subscription_id">
+                  <tr v-for="sub in filteredSubscribers" :key="sub.subscription_id">
+                    <td class="p-5 font-mono font-bold text-neutral-800">
+                      <span class="bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
+                        SUB-{{ sub.subscription_id }}
+                      </span>
+                    </td>
                     <td class="p-5 font-bold text-black">{{ sub.user?.username || sub.user?.email || sub.user_name || 'VIP Member' }}</td>
                     <td class="p-5 uppercase font-bold text-neutral-600">{{ sub.plan_tier || 'Unlimited VIP Wash Club' }}</td>
                     <td class="p-5 text-right">
@@ -511,6 +572,49 @@ const invoices = ref([]);
 const services = ref([]);
 const subscribers = ref([]);
 const feedbacks = ref([]);
+
+// Filter & Search State for Payments Ledger & Subscription Control
+const paymentSearchQuery = ref('');
+const paymentTypeFilter = ref('all');
+
+const filteredInvoices = computed(() => {
+  return invoices.value.filter(inv => {
+    const typeStr = (inv.invoice_type || '').toLowerCase();
+    const matchesType = paymentTypeFilter.value === 'all' || 
+      (paymentTypeFilter.value === 'Single_Detailing' && (typeStr.includes('single') || typeStr.includes('detailing'))) ||
+      (paymentTypeFilter.value === 'Monthly_Roster' && (typeStr.includes('monthly') || typeStr.includes('roster') || typeStr.includes('vip')));
+
+    const query = paymentSearchQuery.value.toLowerCase().trim();
+    if (!query) return matchesType;
+
+    const invIdStr = `inv-${inv.invoice_id}`.toLowerCase();
+    const bookingIdStr = inv.booking_id ? `mtg-${inv.booking_id}`.toLowerCase() : (inv.booking?.booking_id ? `mtg-${inv.booking.booking_id}`.toLowerCase() : '');
+    const dateStr = inv.issued_at ? String(inv.issued_at).toLowerCase() : '';
+
+    return matchesType && (invIdStr.includes(query) || bookingIdStr.includes(query) || dateStr.includes(query) || typeStr.includes(query));
+  });
+});
+
+const subSearchQuery = ref('');
+const subStatusFilter = ref('all');
+
+const filteredSubscribers = computed(() => {
+  return subscribers.value.filter(sub => {
+    const rawStatus = (sub.plan_status || 'Active').toLowerCase();
+    const filterVal = subStatusFilter.value.toLowerCase();
+    const matchesStatus = filterVal === 'all' || rawStatus === filterVal || rawStatus.replace('_', ' ') === filterVal.replace('_', ' ');
+
+    const query = subSearchQuery.value.toLowerCase().trim();
+    if (!query) return matchesStatus;
+
+    const subIdStr = `sub-${sub.subscription_id}`.toLowerCase();
+    const nameStr = (sub.user?.username || sub.user?.email || sub.user_name || '').toLowerCase();
+    const emailStr = (sub.user?.email || '').toLowerCase();
+    const tierStr = (sub.plan_tier || '').toLowerCase();
+
+    return matchesStatus && (subIdStr.includes(query) || nameStr.includes(query) || emailStr.includes(query) || tierStr.includes(query));
+  });
+});
 
 // Service Editing & Creation State
 const showServiceModal = ref(false);
