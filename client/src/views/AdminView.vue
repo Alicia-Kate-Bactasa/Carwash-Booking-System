@@ -1088,7 +1088,7 @@ const loadBookings = async () => {
             service: app.service?.service_name || app.services?.service_name || app.service_name || 'Car Wash',
             date: app.scheduled_date ? String(app.scheduled_date).split('T')[0] : '—',
             time: app.time_slot || '—',
-            client: app.customer?.full_name || app.customers?.full_name || app.customer_name || 'Client',
+            client: app.user?.username || app.customer?.full_name || app.user?.email || app.customers?.full_name || app.customer_name || 'Valued Client',
             userType: app.user_id ? 'subscriber' : 'regular'
           };
       });
